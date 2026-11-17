@@ -607,9 +607,9 @@
               <span class="text-base">📋</span>
               <span>Histórico (<span id="audit-count-badge">0</span>)</span>
             </button>
-            <button type="button" onclick="openReminderModal()" class="p-2.5 bg-white hover:bg-amber-50 border border-amber-300 rounded-lg shadow-sm flex items-center justify-center gap-2 text-amber-900 font-bold transition">
+            <button type="button" id="reminder-main-btn" onclick="openReminderModal()" class="p-2.5 bg-white hover:bg-amber-50 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center gap-2 text-gray-700 font-bold transition">
               <span class="text-base">⏰</span>
-              <span id="reminder-btn-label">Lembrete (Ativo)</span>
+              <span id="reminder-btn-label">Lembrete (Off)</span>
             </button>
           </div>
 
@@ -736,11 +736,14 @@
 
           <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg space-y-2 text-[11px]">
             <label class="flex items-center justify-between font-bold text-amber-950 cursor-pointer">
-              <span>⏰ Ativar Lembrete Semanal</span>
-              <input type="checkbox" id="chk-auto-schedule" checked onchange="toggleScheduleToast()" class="accent-amber-600 w-4 h-4">
+              <span>⏰ Permitir e Ativar Lembrete Semanal</span>
+              <input type="checkbox" id="chk-auto-schedule" onchange="previewReminderModalStatus()" class="accent-amber-600 w-4 h-4">
             </label>
+            <div id="reminder-modal-status-pill" class="px-2 py-1 bg-white border border-gray-300 rounded text-[10px] font-bold text-gray-600">
+              Status atual: Desativado (requer sua permissão para ativar)
+            </div>
             <p class="text-[10px] text-amber-900 leading-snug">
-              Notifica você automaticamente quando o cache ultrapassar o limite definido (sempre exigindo sua permissão antes de apagar qualquer dado).
+              Por privacidade (LGPD), o lembrete fica desativado automaticamente e só é ativado quando você marca a permissão acima e salva.
             </p>
           </div>
 
@@ -903,6 +906,10 @@
           </div>
         </div>
 
+        <!-- Painel de Sessão Remota Estilo AnyDesk no Cliente (Fica acima do chat mantendo o chat 100% ativo!) -->
+        <div id="client-anydesk-dock" class="hidden mx-3 mt-2 p-2.5 bg-slate-900 border-2 border-red-500 rounded-xl text-white text-[10px] space-y-2 shadow-lg shrink-0">
+        </div>
+
         <!-- Mensagens do Suporte Humano -->
         <div id="human-support-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
         </div>
@@ -1032,8 +1039,8 @@
 
             <!-- Botões de Ação Remota -->
             <div class="grid grid-cols-3 gap-1 text-[10px]">
-              <button type="button" id="btn-tech-remote-clean" onclick="techExecuteRemoteAction('clean')" class="py-1.5 px-1 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 rounded font-bold">
-                ⚡ Limpeza Remota
+              <button type="button" id="btn-tech-remote-clean" onclick="toggleTechAnyDeskPanel()" class="py-1.5 px-1 bg-red-50 hover:bg-red-100 border border-red-400 text-red-900 rounded font-bold flex items-center justify-center gap-0.5 shadow-sm">
+                <span>🖥️ Limpeza Remota</span>
               </button>
               <button type="button" id="btn-tech-safe-mode" onclick="techExecuteRemoteAction('safemode')" class="py-1.5 px-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 rounded font-bold">
                 🛡️ Modo Seguro
@@ -1041,6 +1048,66 @@
               <button type="button" id="btn-tech-resolve" onclick="techExecuteRemoteAction('resolve')" class="py-1.5 px-1 bg-green-700 hover:bg-green-800 text-white rounded font-bold">
                 ✓ Resolvido
               </button>
+            </div>
+
+            <!-- Painel AnyDesk do Suporte Técnico (PC -> Celular / Celular -> Celular + Programa do Suporte) mantendo o chat ativo abaixo -->
+            <div id="tech-anydesk-panel" class="hidden p-2.5 bg-slate-900 border-2 border-red-500 rounded-xl text-white space-y-2 text-[10px] shadow-md">
+              <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-1.5 py-0.5 bg-red-600 text-white rounded font-extrabold text-[9px] tracking-wide">AnyDesk</span>
+                  <strong class="text-[11px] text-white">Acesso & Limpeza Remota</strong>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span id="tech-anydesk-status-pill" class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 text-amber-300 rounded text-[9px] font-bold">Pronto</span>
+                  <button type="button" onclick="toggleTechAnyDeskPanel(false)" class="text-slate-400 hover:text-white font-bold px-1">&#10005;</button>
+                </div>
+              </div>
+
+              <!-- Escolha do Modo: PC para Celular ou Celular para Celular -->
+              <div class="space-y-1">
+                <span class="text-slate-300 font-bold block text-[9px]">1. Modo de Conexão Remota (ID Cliente: <code id="tech-anydesk-id-label" class="text-emerald-300 font-bold">842 910 355</code>):</span>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button type="button" id="btn-mode-pc-phone" onclick="selectTechRemoteMode('pc_to_phone')" class="py-1 px-2 rounded bg-red-600 text-white font-bold border border-red-400 text-[10px] flex items-center justify-center gap-1">
+                    <span>💻 PC &rarr; 📱 Celular</span>
+                  </button>
+                  <button type="button" id="btn-mode-phone-phone" onclick="selectTechRemoteMode('phone_to_phone')" class="py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-600 text-[10px] flex items-center justify-center gap-1">
+                    <span>📱 Celular &rarr; 📱 Celular</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Programa / Ferramenta do Suporte para injetar e rodar no aparelho -->
+              <div class="space-y-1">
+                <label class="text-slate-300 font-bold block text-[9px]">2. Programa / Ferramenta do Suporte para Executar no Aparelho:</label>
+                <input id="tech-remote-program-input" type="text" value="HelpTop CleanDesk Pro v4.2 (Limpador + Kernel Boost)" placeholder="Digite ou escolha o programa do suporte..." class="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1 text-[10px] text-emerald-300 font-mono">
+                <div class="flex flex-wrap gap-1 pt-0.5">
+                  <button type="button" onclick="setTechSupportProgramPreset('HelpTop CleanDesk Pro v4.2 (Limpador + Kernel Boost)')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-200">
+                    🧹 CleanDesk Pro v4.2
+                  </button>
+                  <button type="button" onclick="setTechSupportProgramPreset('TurboRAM & Anti-Lag Studio (Suporte Oficial)')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-200">
+                    🚀 TurboRAM Studio
+                  </button>
+                  <button type="button" onclick="setTechSupportProgramPreset('Diagnóstico & Reset de Sistema OEM v2.8')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-200">
+                    🛠️ Reset Sistema OEM
+                  </button>
+                </div>
+              </div>
+
+              <!-- Console ao vivo da sessão AnyDesk no painel do Técnico -->
+              <div id="tech-anydesk-live-box" class="hidden p-2 bg-slate-950 border border-slate-700 rounded font-mono text-[9px] text-emerald-400 space-y-1">
+              </div>
+
+              <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+                <button type="button" onclick="techExecuteRemoteAction('anydesk_request')" class="py-1.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded text-[10px] shadow">
+                  📡 Pedir Permissão Remota
+                </button>
+                <button type="button" onclick="techExecuteRemoteAction('clean')" class="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded text-[10px] shadow">
+                  ⚡ Rodar Programa & Limpar
+                </button>
+              </div>
+              <div class="text-[9px] text-slate-400 text-center">
+                💬 O chat abaixo permanece 100% ativo durante toda a conexão remota.
+              </div>
             </div>
 
             <!-- Chat do Técnico com o Cliente -->
@@ -1632,6 +1699,7 @@
       isAuthenticated: false,
       user: null,
       analysisVisibleOnDashboard: false,
+      reminderEnabled: false,
       lastBotTopic: "geral",
       techDutyStatus: "Disponível",
       previousScreenBeforeSettings: null,
@@ -1666,6 +1734,7 @@
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
       });
+      syncReminderButtonBadge();
       goToScreen('welcome');
       updateClock();
       setInterval(updateClock, 30000);
@@ -2291,20 +2360,53 @@
       document.getElementById('audit-log-modal').classList.add('hidden');
     }
 
+    function syncReminderButtonBadge() {
+      const lbl = document.getElementById('reminder-btn-label');
+      const btn = document.getElementById('reminder-main-btn');
+      const isEnabled = Boolean(demoState.reminderEnabled);
+      if (lbl) {
+        lbl.innerText = isEnabled ? "Lembrete (Ativo)" : "Lembrete (Off)";
+      }
+      if (btn) {
+        btn.className = isEnabled
+          ? "p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-400 rounded-lg shadow-sm flex items-center justify-center gap-2 text-amber-900 font-bold transition"
+          : "p-2.5 bg-white hover:bg-amber-50 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center gap-2 text-gray-700 font-bold transition";
+      }
+    }
+
+    function previewReminderModalStatus() {
+      const chk = document.getElementById('chk-auto-schedule');
+      const pill = document.getElementById('reminder-modal-status-pill');
+      if (!chk || !pill) return;
+      if (chk.checked) {
+        pill.className = "px-2 py-1 bg-emerald-100 border border-emerald-400 rounded text-[10px] font-bold text-emerald-900";
+        pill.innerText = "✓ Permissão marcada! Clique em 'Salvar Lembrete' abaixo para ativar.";
+      } else {
+        pill.className = "px-2 py-1 bg-white border border-gray-300 rounded text-[10px] font-bold text-gray-600";
+        pill.innerText = "Status atual: Desativado (requer sua permissão para ativar)";
+      }
+    }
+
     function openReminderModal() {
+      const chk = document.getElementById('chk-auto-schedule');
+      if (chk) {
+        chk.checked = Boolean(demoState.reminderEnabled);
+      }
+      previewReminderModalStatus();
       document.getElementById('reminder-modal').classList.remove('hidden');
     }
 
     function closeReminderModal() {
+      const chk = document.getElementById('chk-auto-schedule');
+      if (chk) {
+        chk.checked = Boolean(demoState.reminderEnabled);
+      }
+      syncReminderButtonBadge();
       document.getElementById('reminder-modal').classList.add('hidden');
     }
 
     function toggleScheduleToast() {
-      const chk = document.getElementById('chk-auto-schedule');
-      const lbl = document.getElementById('reminder-btn-label');
-      if (chk && lbl) {
-        lbl.innerText = chk.checked ? "Lembrete (Ativo)" : "Lembrete (Off)";
-      }
+      previewReminderModalStatus();
     }
 
     function saveReminderConfiguration() {
@@ -2312,12 +2414,14 @@
       const day = document.getElementById('reminder-day-select')?.value || "Segunda-feira";
       const time = document.getElementById('reminder-time-input')?.value || "09:00";
       const limit = document.getElementById('reminder-limit-select')?.value || "1 GB";
-      toggleScheduleToast();
-      closeReminderModal();
-      if (chk && chk.checked) {
-        showToastNotice(`Lembrete salvo: ${day} às ${time} (> ${limit})!`);
+      demoState.reminderEnabled = Boolean(chk && chk.checked);
+      syncReminderButtonBadge();
+      document.getElementById('reminder-modal').classList.add('hidden');
+      if (demoState.reminderEnabled) {
+        addAuditLogEntry('PÓS-ANÁLISE', `Lembrete Semanal autorizado pelo usuário: ${day} às ${time} (> ${limit}).`);
+        showToastNotice(`Lembrete permitido e ativado: ${day} às ${time} (> ${limit})!`);
       } else {
-        showToastNotice("Lembrete semanal desativado.");
+        showToastNotice("Lembrete semanal mantido desativado.");
       }
     }
 
@@ -4911,6 +5015,225 @@
       quickGenerateAndPasteProtocol();
     }
 
+    let currentTechRemoteMode = 'pc_to_phone';
+
+    function formatRemoteIdFromProtocol(protocolCode = 'HT-1000') {
+      const digits = (protocolCode.replace(/\D/g, '') || '4829').padEnd(4, '7');
+      return `842 ${digits.slice(0, 3)} ${digits.slice(1, 4)}`;
+    }
+
+    function toggleTechAnyDeskPanel(forceState = null) {
+      if (!activeTechTicketProtocol) {
+        showToastNotice("Selecione um protocolo na fila primeiro!");
+        return;
+      }
+      const panel = document.getElementById('tech-anydesk-panel');
+      if (!panel) return;
+      const shouldShow = forceState !== null ? forceState : panel.classList.contains('hidden');
+      if (shouldShow) {
+        panel.classList.remove('hidden');
+        const idEl = document.getElementById('tech-anydesk-id-label');
+        if (idEl) idEl.innerText = formatRemoteIdFromProtocol(activeTechTicketProtocol);
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+
+    function selectTechRemoteMode(mode) {
+      currentTechRemoteMode = mode === 'phone_to_phone' ? 'phone_to_phone' : 'pc_to_phone';
+      const btnPc = document.getElementById('btn-mode-pc-phone');
+      const btnPhone = document.getElementById('btn-mode-phone-phone');
+      if (btnPc && btnPhone) {
+        if (currentTechRemoteMode === 'pc_to_phone') {
+          btnPc.className = "py-1 px-2 rounded bg-red-600 text-white font-bold border border-red-400 text-[10px] flex items-center justify-center gap-1";
+          btnPhone.className = "py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-600 text-[10px] flex items-center justify-center gap-1";
+        } else {
+          btnPhone.className = "py-1 px-2 rounded bg-red-600 text-white font-bold border border-red-400 text-[10px] flex items-center justify-center gap-1";
+          btnPc.className = "py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-600 text-[10px] flex items-center justify-center gap-1";
+        }
+      }
+    }
+
+    function setTechSupportProgramPreset(progName) {
+      const inp = document.getElementById('tech-remote-program-input');
+      if (inp) inp.value = progName;
+    }
+
+    function renderClientAnyDeskDock(ticket) {
+      const dock = document.getElementById('client-anydesk-dock');
+      if (!dock) return;
+      const rs = ticket && ticket.remoteSession ? ticket.remoteSession : null;
+      if (!rs || !rs.active) {
+        dock.classList.add('hidden');
+        dock.innerHTML = '';
+        return;
+      }
+
+      dock.classList.remove('hidden');
+      const modeLabel = rs.mode === 'phone_to_phone' ? '📱 Celular &rarr; 📱 Celular' : '💻 PC &rarr; 📱 Celular';
+      const remoteId = rs.remoteId || formatRemoteIdFromProtocol(ticket.protocol);
+      const progName = rs.programName || 'HelpTop CleanDesk Pro v4.2';
+      const techName = rs.techName || ticket.assignedTech || 'Suporte Técnico';
+
+      if (rs.status === 'requested') {
+        dock.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 bg-red-600 text-white rounded font-extrabold text-[9px] animate-pulse">AnyDesk</span>
+              <strong class="text-[11px] text-white">Pedido de Conexão Remota</strong>
+            </div>
+            <span class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 text-emerald-300 rounded font-mono text-[9px]">ID: ${remoteId}</span>
+          </div>
+          <div class="text-slate-200 leading-snug space-y-1">
+            <div>O técnico <strong class="text-amber-300">${techName}</strong> solicita acesso remoto (<strong>${modeLabel}</strong>) para executar o programa de suporte:</div>
+            <div class="p-1.5 bg-slate-950 border border-slate-700 rounded font-mono text-emerald-300 text-[9px]">
+              📦 ${progName}
+            </div>
+            <div class="text-[9px] text-slate-400">💬 O seu chat abaixo continua 100% ativo durante toda a sessão!</div>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+            <button type="button" onclick="clientRespondAnyDeskSession('${ticket.protocol}', true)" class="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded text-[10px] shadow">
+              ✓ Permitir & Rodar Programa
+            </button>
+            <button type="button" onclick="clientRespondAnyDeskSession('${ticket.protocol}', false)" class="py-1.5 px-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold rounded text-[10px]">
+              ✕ Recusar Acesso
+            </button>
+          </div>
+        `;
+      } else {
+        const logs = Array.isArray(rs.logs) && rs.logs.length > 0
+          ? rs.logs
+          : [
+              `✓ Túnel AnyDesk ativo (${modeLabel} • ID ${remoteId})`,
+              `📦 Programa do Suporte carregado: ${progName}`,
+              `⚡ Limpeza Remota concluída: RAM 45% • Temp 36.2°C • Desempenho 96%`
+            ];
+        dock.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span class="px-1.5 py-0.5 bg-red-600 text-white rounded font-extrabold text-[9px]">AnyDesk Ativo</span>
+              <strong class="text-[10px] text-emerald-300 truncate">${modeLabel}</strong>
+            </div>
+            <button type="button" onclick="closeAnyDeskRemoteSession('${ticket.protocol}')" class="px-1.5 py-0.5 bg-red-800 hover:bg-red-700 text-white rounded text-[9px] font-bold">
+              Desconectar
+            </button>
+          </div>
+          <div class="text-[9px] text-slate-300 flex items-center justify-between">
+            <span>Técnico: <strong class="text-white">${techName}</strong></span>
+            <span class="font-mono text-amber-300">ID: ${remoteId}</span>
+          </div>
+          <div class="p-1.5 bg-slate-950 border border-slate-700 rounded font-mono text-[9px] text-emerald-300 space-y-0.5">
+            ${logs.map(l => `<div>${l}</div>`).join('')}
+          </div>
+          <div class="text-[9px] text-slate-400 flex items-center justify-between">
+            <span>💬 Chat ao vivo liberado abaixo enquanto o suporte atua.</span>
+            <span class="text-emerald-400 font-bold">● Programa Ativo</span>
+          </div>
+        `;
+      }
+    }
+
+    function clientRespondAnyDeskSession(protocolCode, accepted) {
+      supportTickets = loadSupportTickets();
+      const ticket = supportTickets.find(t => t.protocol === protocolCode);
+      if (!ticket || !ticket.remoteSession) return;
+
+      const rs = ticket.remoteSession;
+      const modeText = rs.mode === 'phone_to_phone' ? 'Celular para Celular' : 'PC para Celular';
+      const progName = rs.programName || 'HelpTop CleanDesk Pro v4.2';
+
+      if (!accepted) {
+        ticket.remoteSession.active = false;
+        ticket.remoteSession.status = 'declined';
+        ticket.messages.push({
+          senderRole: 'system',
+          senderName: ticket.clientName,
+          text: `⚠️ O cliente recusou a sessão remota AnyDesk. O atendimento segue pelo chat e passo a passo manual.`
+        });
+        saveSupportTickets(false);
+        broadcastFullState({
+          action: 'TECH_REMOTE',
+          protocol: ticket.protocol,
+          previewText: `Cliente recusou o acesso AnyDesk no protocolo ${ticket.protocol}.`
+        });
+        renderClientSupportMessages(protocolCode);
+        return;
+      }
+
+      // Cliente aceitou: ativa a sessão AnyDesk, roda o Programa do Suporte e aplica a Limpeza Remota mantendo o chat aberto!
+      ticket.remoteSession.active = true;
+      ticket.remoteSession.status = 'connected';
+      ticket.remoteSession.logs = [
+        `✓ Conexão AnyDesk (${modeText}) autorizada pelo cliente`,
+        `📦 Executando programa do suporte: ${progName}`,
+        `⚡ Limpando cache e processos travados -> RAM: 45% | Temp: 36.2°C | Desempenho: 96%`
+      ];
+      ticket.metrics = {
+        ram: 45,
+        ramUsed: 2.7,
+        ramTotal: 6.0,
+        storage: 76,
+        storageUsed: 97,
+        storageTotal: 128,
+        temp: 36.2,
+        performance: 96,
+        isCritical: false
+      };
+      demoState.metrics = { ...demoState.metrics, ...ticket.metrics };
+      syncUiMetrics();
+
+      const msgText = `🖥️ <strong>Sessão AnyDesk (${modeText}) Conectada!</strong> Programa do suporte <code>${progName}</code> executado com sucesso: RAM reduzida para <strong>45%</strong>, Temperatura em <strong>36.2°C</strong> e Desempenho em <strong>96%</strong> (chat continua ativo!).`;
+      ticket.messages.push({
+        senderRole: 'system',
+        senderName: rs.techName || 'Suporte Técnico',
+        text: msgText
+      });
+
+      addAuditLogEntry(
+        'PÓS-ANÁLISE',
+        `Sessão AnyDesk (${modeText}) + Programa "${progName}" autorizados no protocolo ${ticket.protocol} (RAM: 45%, Desempenho: 96%).`
+      );
+
+      saveSupportTickets(false);
+      broadcastFullState({
+        action: 'TECH_REMOTE',
+        protocol: ticket.protocol,
+        previewText: msgText
+      });
+      renderClientSupportMessages(protocolCode);
+      showToastNotice("Sessão AnyDesk conectada e programa do suporte executado!");
+    }
+
+    function closeAnyDeskRemoteSession(protocolCode) {
+      const targetProto = protocolCode || activeTechTicketProtocol || generatedProtocolCode;
+      if (!targetProto) return;
+      supportTickets = loadSupportTickets();
+      const ticket = supportTickets.find(t => t.protocol === targetProto);
+      if (!ticket || !ticket.remoteSession) return;
+
+      ticket.remoteSession.active = false;
+      ticket.remoteSession.status = 'closed';
+      ticket.messages.push({
+        senderRole: 'system',
+        senderName: 'HelpTop AnyDesk',
+        text: `🔌 Sessão remota AnyDesk encerrada. O chat de suporte continua aberto normalmente.`
+      });
+      saveSupportTickets(false);
+      broadcastFullState({
+        action: 'TECH_REMOTE',
+        protocol: ticket.protocol,
+        previewText: `Sessão AnyDesk encerrada no protocolo ${ticket.protocol}.`
+      });
+      if (demoState.currentScreen === 'support') {
+        renderClientSupportMessages(ticket.protocol);
+      }
+      if (demoState.currentScreen === 'tech-panel') {
+        renderTechActiveTicketDetails();
+      }
+      showToastNotice("Sessão remota AnyDesk desconectada (chat segue ativo).");
+    }
+
     function renderClientSupportMessages(protocolCode) {
       supportTickets = loadSupportTickets();
       const ticket = supportTickets.find(t => t.protocol === protocolCode);
@@ -4926,7 +5249,7 @@
       if (techBar) techBar.classList.remove('hidden');
       if (genBtn) genBtn.classList.add('hidden');
       if (helperLabel) helperLabel.innerText = `Conectado ao protocolo ${ticket.protocol}:`;
-      if (input) input.placeholder = "Digite sua mensagem para o técnico...";
+      if (input) input.placeholder = "Digite sua mensagem para o técnico (chat ativo)...";
 
       if (ticket.assignedTech) {
         document.getElementById('support-header-status').innerHTML = `<strong>${ticket.protocol}:</strong> ${ticket.status}`;
@@ -4939,6 +5262,9 @@
           techLabel.innerHTML = `⏳ <strong>Aguardando técnico aceitar</strong> (abra a 2ª Tela como Suporte)`;
         }
       }
+
+      // Atualiza o Dock AnyDesk acima do chat (mantendo o chat 100% ativo abaixo)
+      renderClientAnyDeskDock(ticket);
 
       container.innerHTML = `
         <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 flex items-center justify-between gap-2">
@@ -5108,6 +5434,38 @@
         ? "px-2 py-0.5 bg-emerald-100 border border-emerald-400 text-emerald-900 rounded text-[9px] font-bold shrink-0"
         : "px-2 py-0.5 bg-blue-100 border border-blue-300 text-blue-900 rounded text-[9px] font-bold shrink-0";
 
+      const idEl = document.getElementById('tech-anydesk-id-label');
+      if (idEl) idEl.innerText = formatRemoteIdFromProtocol(ticket.protocol);
+
+      const statusPill = document.getElementById('tech-anydesk-status-pill');
+      const liveBox = document.getElementById('tech-anydesk-live-box');
+      if (ticket.remoteSession && ticket.remoteSession.active) {
+        const rs = ticket.remoteSession;
+        const modeTxt = rs.mode === 'phone_to_phone' ? 'Celular → Celular' : 'PC → Celular';
+        if (statusPill) {
+          statusPill.innerText = rs.status === 'requested' ? '⏳ Aguardando Cliente' : `🟢 Conectado (${modeTxt})`;
+          statusPill.className = rs.status === 'requested'
+            ? "px-1.5 py-0.5 bg-amber-950 border border-amber-500 text-amber-300 rounded text-[9px] font-bold"
+            : "px-1.5 py-0.5 bg-emerald-950 border border-emerald-500 text-emerald-300 rounded text-[9px] font-bold";
+        }
+        if (liveBox) {
+          liveBox.classList.remove('hidden');
+          const logs = Array.isArray(rs.logs) && rs.logs.length > 0
+            ? rs.logs
+            : [`📡 Aguardando permissão AnyDesk no aparelho de ${ticket.clientName}...`];
+          liveBox.innerHTML = logs.map(l => `<div>${l}</div>`).join('');
+        }
+      } else {
+        if (statusPill) {
+          statusPill.innerText = "Pronto";
+          statusPill.className = "px-1.5 py-0.5 bg-slate-800 border border-slate-600 text-amber-300 rounded text-[9px] font-bold";
+        }
+        if (liveBox) {
+          liveBox.classList.add('hidden');
+          liveBox.innerHTML = '';
+        }
+      }
+
       const m = ticket.metrics || { ram: 88, storage: 94, temp: 41.8, performance: 52 };
       const ramEl = document.getElementById('tech-metric-ram');
       const stoEl = document.getElementById('tech-metric-storage');
@@ -5213,9 +5571,45 @@
       const techName = demoState.user ? demoState.user.name : "Suporte Técnico";
       ticket.assignedTech = techName;
 
+      const progInput = document.getElementById('tech-remote-program-input');
+      const programName = (progInput && progInput.value.trim())
+        ? progInput.value.trim()
+        : "HelpTop CleanDesk Pro v4.2 (Limpador + Kernel Boost)";
+      const modeText = currentTechRemoteMode === 'phone_to_phone' ? "Celular para Celular" : "PC para Celular";
+      const remoteId = formatRemoteIdFromProtocol(ticket.protocol);
+
       let msgText = "";
-      if (actionType === 'clean') {
+      if (actionType === 'anydesk_request') {
         ticket.status = "Em Atendimento";
+        ticket.remoteSession = {
+          active: true,
+          status: 'requested',
+          mode: currentTechRemoteMode,
+          remoteId: remoteId,
+          programName: programName,
+          techName: techName,
+          logs: [
+            `📡 Solicitação AnyDesk (${modeText} • ID ${remoteId}) enviada ao cliente...`,
+            `📦 Programa preparado: ${programName}`
+          ]
+        };
+        msgText = `🖥️ <strong>Solicitação de Acesso Remoto (Estilo AnyDesk — ${modeText}):</strong> O técnico ${techName} pediu permissão (ID: <code>${remoteId}</code>) para conectar e executar o programa de suporte <strong>"${programName}"</strong>. Autorize no painel acima do chat!`;
+        ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
+      } else if (actionType === 'clean') {
+        ticket.status = "Em Atendimento";
+        ticket.remoteSession = {
+          active: true,
+          status: 'connected',
+          mode: currentTechRemoteMode,
+          remoteId: remoteId,
+          programName: programName,
+          techName: techName,
+          logs: [
+            `🟢 Sessão AnyDesk Ativa (${modeText} • ID ${remoteId})`,
+            `📦 Programa do Suporte em execução: ${programName}`,
+            `⚡ Limpeza Remota concluída: RAM 45% • Temp 36.2°C • Desempenho 96%`
+          ]
+        };
         ticket.metrics = {
           ram: 45,
           ramUsed: 2.7,
@@ -5227,7 +5621,7 @@
           performance: 96,
           isCritical: false
         };
-        msgText = `⚡ Limpeza Remota executada pelo técnico ${techName}: RAM reduzida para 45%, Temperatura em 36.2°C e Desempenho elevado para 96%!`;
+        msgText = `🖥️ <strong>Limpeza Remota via AnyDesk (${modeText} • ID ${remoteId}):</strong> O técnico ${techName} executou o programa de suporte <code>${programName}</code>! RAM reduzida para <strong>45%</strong>, Temperatura em <strong>36.2°C</strong> e Desempenho em <strong>96%</strong> (o chat continua ativo!).`;
         ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
       } else if (actionType === 'safemode') {
         ticket.status = "Em Atendimento";
@@ -5235,6 +5629,9 @@
         ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
       } else if (actionType === 'resolve') {
         ticket.status = "Resolvido";
+        if (ticket.remoteSession) {
+          ticket.remoteSession.active = false;
+        }
         msgText = `✓ Chamado ${ticket.protocol} concluído e marcado como Resolvido por ${techName}. Avalie o atendimento abaixo!`;
         ticket.messages.push({ senderRole: 'system', senderName: techName, text: msgText });
       }
@@ -5247,7 +5644,7 @@
       });
       renderTechSupportQueue();
       renderTechActiveTicketDetails();
-      showToastNotice("Ação remota sincronizada com o cliente em tempo real!");
+      showToastNotice("Sessão/Programa AnyDesk sincronizado com o cliente (chat continua ativo)!");
     }
 
     // =========================================================================
@@ -5315,6 +5712,7 @@
       demoState.isAuthenticated = false;
       demoState.user = null;
       demoState.analysisVisibleOnDashboard = false;
+      demoState.reminderEnabled = false;
       demoState.auditLogs = [];
       demoState.metrics = {
         ram: 88,
@@ -5329,6 +5727,10 @@
         batteryDrain: "4.1V • Estável",
         isCritical: true
       };
+
+      const chkRem = document.getElementById('chk-auto-schedule');
+      if (chkRem) chkRem.checked = false;
+      syncReminderButtonBadge();
 
       broadcastFullState({ action: 'RESET_ALL' });
       syncUiMetrics();
