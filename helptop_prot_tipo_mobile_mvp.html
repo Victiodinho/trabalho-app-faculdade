@@ -607,9 +607,9 @@
               <span class="text-base">📋</span>
               <span>Histórico (<span id="audit-count-badge">0</span>)</span>
             </button>
-            <button type="button" onclick="openReminderModal()" class="p-2.5 bg-white hover:bg-amber-50 border border-amber-300 rounded-lg shadow-sm flex items-center justify-center gap-2 text-amber-900 font-bold transition">
+            <button type="button" id="reminder-main-btn" onclick="openReminderModal()" class="p-2.5 bg-white hover:bg-amber-50 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center gap-2 text-gray-700 font-bold transition">
               <span class="text-base">⏰</span>
-              <span id="reminder-btn-label">Lembrete (Ativo)</span>
+              <span id="reminder-btn-label">Lembrete (Off)</span>
             </button>
           </div>
 
@@ -736,11 +736,14 @@
 
           <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-lg space-y-2 text-[11px]">
             <label class="flex items-center justify-between font-bold text-amber-950 cursor-pointer">
-              <span>⏰ Ativar Lembrete Semanal</span>
-              <input type="checkbox" id="chk-auto-schedule" checked onchange="toggleScheduleToast()" class="accent-amber-600 w-4 h-4">
+              <span>⏰ Permitir e Ativar Lembrete Semanal</span>
+              <input type="checkbox" id="chk-auto-schedule" onchange="previewReminderModalStatus()" class="accent-amber-600 w-4 h-4">
             </label>
+            <div id="reminder-modal-status-pill" class="px-2 py-1 bg-white border border-gray-300 rounded text-[10px] font-bold text-gray-600">
+              Status atual: Desativado (requer sua permissão para ativar)
+            </div>
             <p class="text-[10px] text-amber-900 leading-snug">
-              Notifica você automaticamente quando o cache ultrapassar o limite definido (sempre exigindo sua permissão antes de apagar qualquer dado).
+              Por privacidade (LGPD), o lembrete fica desativado automaticamente e só é ativado quando você marca a permissão acima e salva.
             </p>
           </div>
 
@@ -903,6 +906,10 @@
           </div>
         </div>
 
+        <!-- Painel de Sessão Remota Estilo AnyDesk no Cliente (Fica acima do chat mantendo o chat 100% ativo!) -->
+        <div id="client-anydesk-dock" class="hidden mx-3 mt-2 p-2.5 bg-slate-900 border-2 border-red-500 rounded-xl text-white text-[10px] space-y-2 shadow-lg shrink-0">
+        </div>
+
         <!-- Mensagens do Suporte Humano -->
         <div id="human-support-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
         </div>
@@ -1032,8 +1039,8 @@
 
             <!-- Botões de Ação Remota -->
             <div class="grid grid-cols-3 gap-1 text-[10px]">
-              <button type="button" id="btn-tech-remote-clean" onclick="techExecuteRemoteAction('clean')" class="py-1.5 px-1 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 rounded font-bold">
-                ⚡ Limpeza Remota
+              <button type="button" id="btn-tech-remote-clean" onclick="toggleTechAnyDeskPanel()" class="py-1.5 px-1 bg-red-50 hover:bg-red-100 border border-red-400 text-red-900 rounded font-bold flex items-center justify-center gap-0.5 shadow-sm">
+                <span>🖥️ Limpeza Remota</span>
               </button>
               <button type="button" id="btn-tech-safe-mode" onclick="techExecuteRemoteAction('safemode')" class="py-1.5 px-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 rounded font-bold">
                 🛡️ Modo Seguro
@@ -1041,6 +1048,66 @@
               <button type="button" id="btn-tech-resolve" onclick="techExecuteRemoteAction('resolve')" class="py-1.5 px-1 bg-green-700 hover:bg-green-800 text-white rounded font-bold">
                 ✓ Resolvido
               </button>
+            </div>
+
+            <!-- Painel AnyDesk do Suporte Técnico (PC -> Celular / Celular -> Celular + Programa do Suporte) mantendo o chat ativo abaixo -->
+            <div id="tech-anydesk-panel" class="hidden p-2.5 bg-slate-900 border-2 border-red-500 rounded-xl text-white space-y-2 text-[10px] shadow-md">
+              <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-1.5 py-0.5 bg-red-600 text-white rounded font-extrabold text-[9px] tracking-wide">AnyDesk</span>
+                  <strong class="text-[11px] text-white">Acesso & Limpeza Remota</strong>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span id="tech-anydesk-status-pill" class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 text-amber-300 rounded text-[9px] font-bold">Pronto</span>
+                  <button type="button" onclick="toggleTechAnyDeskPanel(false)" class="text-slate-400 hover:text-white font-bold px-1">&#10005;</button>
+                </div>
+              </div>
+
+              <!-- Escolha do Modo: PC para Celular ou Celular para Celular -->
+              <div class="space-y-1">
+                <span class="text-slate-300 font-bold block text-[9px]">1. Modo de Conexão Remota (ID Cliente: <code id="tech-anydesk-id-label" class="text-emerald-300 font-bold">842 910 355</code>):</span>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button type="button" id="btn-mode-pc-phone" onclick="selectTechRemoteMode('pc_to_phone')" class="py-1 px-2 rounded bg-red-600 text-white font-bold border border-red-400 text-[10px] flex items-center justify-center gap-1">
+                    <span>💻 PC &rarr; 📱 Celular</span>
+                  </button>
+                  <button type="button" id="btn-mode-phone-phone" onclick="selectTechRemoteMode('phone_to_phone')" class="py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-600 text-[10px] flex items-center justify-center gap-1">
+                    <span>📱 Celular &rarr; 📱 Celular</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Programa / Ferramenta do Suporte para injetar e rodar no aparelho -->
+              <div class="space-y-1">
+                <label class="text-slate-300 font-bold block text-[9px]">2. Programa / Ferramenta do Suporte para Executar no Aparelho:</label>
+                <input id="tech-remote-program-input" type="text" value="HelpTop CleanDesk Pro v4.2 (Limpador + Kernel Boost)" placeholder="Digite ou escolha o programa do suporte..." class="w-full bg-slate-950 border border-slate-600 rounded px-2 py-1 text-[10px] text-emerald-300 font-mono">
+                <div class="flex flex-wrap gap-1 pt-0.5">
+                  <button type="button" onclick="setTechSupportProgramPreset('HelpTop CleanDesk Pro v4.2 (Limpador + Kernel Boost)')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-200">
+                    🧹 CleanDesk Pro v4.2
+                  </button>
+                  <button type="button" onclick="setTechSupportProgramPreset('TurboRAM & Anti-Lag Studio (Suporte Oficial)')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-200">
+                    🚀 TurboRAM Studio
+                  </button>
+                  <button type="button" onclick="setTechSupportProgramPreset('Diagnóstico & Reset de Sistema OEM v2.8')" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-200">
+                    🛠️ Reset Sistema OEM
+                  </button>
+                </div>
+              </div>
+
+              <!-- Console ao vivo da sessão AnyDesk no painel do Técnico -->
+              <div id="tech-anydesk-live-box" class="hidden p-2 bg-slate-950 border border-slate-700 rounded font-mono text-[9px] text-emerald-400 space-y-1">
+              </div>
+
+              <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+                <button type="button" onclick="techExecuteRemoteAction('anydesk_request')" class="py-1.5 px-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded text-[10px] shadow">
+                  📡 Pedir Permissão Remota
+                </button>
+                <button type="button" onclick="techExecuteRemoteAction('clean')" class="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded text-[10px] shadow">
+                  ⚡ Rodar Programa & Limpar
+                </button>
+              </div>
+              <div class="text-[9px] text-slate-400 text-center">
+                💬 O chat abaixo permanece 100% ativo durante toda a conexão remota.
+              </div>
             </div>
 
             <!-- Chat do Técnico com o Cliente -->
@@ -1346,10 +1413,10 @@
           <div id="uac-modal-steps" class="space-y-1 bg-gray-50 border border-gray-200 rounded p-2 text-[11px]"></div>
           <div class="space-y-1.5 pt-1">
             <button type="button" onclick="confirmBotUacExecution(true)" class="w-full py-2 rounded btn-primary font-bold text-xs">
-              ✓ Sim, Autorizar Execução Agora
+              ✓ Sim, Permitir que a IA Faça Isso Agora
             </button>
             <button type="button" onclick="confirmBotUacExecution(false)" class="w-full py-1.5 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium text-[11px]">
-              Não, Mostrar Apenas Passo a Passo Manual
+              📖 Não, Mostrar Passo a Passo Manual
             </button>
           </div>
         </div>
@@ -1632,6 +1699,7 @@
       isAuthenticated: false,
       user: null,
       analysisVisibleOnDashboard: false,
+      reminderEnabled: false,
       lastBotTopic: "geral",
       techDutyStatus: "Disponível",
       previousScreenBeforeSettings: null,
@@ -1666,6 +1734,7 @@
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
       });
+      syncReminderButtonBadge();
       goToScreen('welcome');
       updateClock();
       setInterval(updateClock, 30000);
@@ -2291,20 +2360,53 @@
       document.getElementById('audit-log-modal').classList.add('hidden');
     }
 
+    function syncReminderButtonBadge() {
+      const lbl = document.getElementById('reminder-btn-label');
+      const btn = document.getElementById('reminder-main-btn');
+      const isEnabled = Boolean(demoState.reminderEnabled);
+      if (lbl) {
+        lbl.innerText = isEnabled ? "Lembrete (Ativo)" : "Lembrete (Off)";
+      }
+      if (btn) {
+        btn.className = isEnabled
+          ? "p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-400 rounded-lg shadow-sm flex items-center justify-center gap-2 text-amber-900 font-bold transition"
+          : "p-2.5 bg-white hover:bg-amber-50 border border-gray-300 rounded-lg shadow-sm flex items-center justify-center gap-2 text-gray-700 font-bold transition";
+      }
+    }
+
+    function previewReminderModalStatus() {
+      const chk = document.getElementById('chk-auto-schedule');
+      const pill = document.getElementById('reminder-modal-status-pill');
+      if (!chk || !pill) return;
+      if (chk.checked) {
+        pill.className = "px-2 py-1 bg-emerald-100 border border-emerald-400 rounded text-[10px] font-bold text-emerald-900";
+        pill.innerText = "✓ Permissão marcada! Clique em 'Salvar Lembrete' abaixo para ativar.";
+      } else {
+        pill.className = "px-2 py-1 bg-white border border-gray-300 rounded text-[10px] font-bold text-gray-600";
+        pill.innerText = "Status atual: Desativado (requer sua permissão para ativar)";
+      }
+    }
+
     function openReminderModal() {
+      const chk = document.getElementById('chk-auto-schedule');
+      if (chk) {
+        chk.checked = Boolean(demoState.reminderEnabled);
+      }
+      previewReminderModalStatus();
       document.getElementById('reminder-modal').classList.remove('hidden');
     }
 
     function closeReminderModal() {
+      const chk = document.getElementById('chk-auto-schedule');
+      if (chk) {
+        chk.checked = Boolean(demoState.reminderEnabled);
+      }
+      syncReminderButtonBadge();
       document.getElementById('reminder-modal').classList.add('hidden');
     }
 
     function toggleScheduleToast() {
-      const chk = document.getElementById('chk-auto-schedule');
-      const lbl = document.getElementById('reminder-btn-label');
-      if (chk && lbl) {
-        lbl.innerText = chk.checked ? "Lembrete (Ativo)" : "Lembrete (Off)";
-      }
+      previewReminderModalStatus();
     }
 
     function saveReminderConfiguration() {
@@ -2312,12 +2414,14 @@
       const day = document.getElementById('reminder-day-select')?.value || "Segunda-feira";
       const time = document.getElementById('reminder-time-input')?.value || "09:00";
       const limit = document.getElementById('reminder-limit-select')?.value || "1 GB";
-      toggleScheduleToast();
-      closeReminderModal();
-      if (chk && chk.checked) {
-        showToastNotice(`Lembrete salvo: ${day} às ${time} (> ${limit})!`);
+      demoState.reminderEnabled = Boolean(chk && chk.checked);
+      syncReminderButtonBadge();
+      document.getElementById('reminder-modal').classList.add('hidden');
+      if (demoState.reminderEnabled) {
+        addAuditLogEntry('PÓS-ANÁLISE', `Lembrete Semanal autorizado pelo usuário: ${day} às ${time} (> ${limit}).`);
+        showToastNotice(`Lembrete permitido e ativado: ${day} às ${time} (> ${limit})!`);
       } else {
-        showToastNotice("Lembrete semanal desativado.");
+        showToastNotice("Lembrete semanal mantido desativado.");
       }
     }
 
@@ -2470,7 +2574,8 @@
 
           if (demoState.currentScreen === 'chat') {
             appendBotMessage(
-              `✓ <strong>Limpeza Profunda Concluída!</strong> Liberei <strong>${gbFormatted} GB</strong> de espaço no seu aparelho, reduzi o uso de RAM para <strong>44%</strong> e o desempenho subiu para <strong>97%</strong>. Tudo foi registrado no seu Histórico!`
+              `✓ <strong>Limpeza Profunda Concluída!</strong> Liberei <strong>${gbFormatted} GB</strong> de espaço no seu aparelho, reduzi o uso de RAM para <strong>44%</strong> e o desempenho subiu para <strong>97%</strong>. Tudo foi registrado no seu Histórico!`,
+              { showAiCard: false }
             );
           }
         }
@@ -2524,7 +2629,8 @@
         showToastNotice("Todos os 4 sensores testados e aprovados!");
         if (demoState.currentScreen === 'chat') {
           appendBotMessage(
-            `🩺 <strong>Relatório de Sensores Concluído:</strong> Alto-falante (880Hz OK), Matriz Touchscreen (OK), Antena Wi-Fi/4G (Ping 14ms OK) e Célula de Bateria (4.18V OK). Nenhum defeito físico encontrado!`
+            `🩺 <strong>Relatório de Sensores Concluído:</strong> Alto-falante (880Hz OK), Matriz Touchscreen (OK), Antena Wi-Fi/4G (Ping 14ms OK) e Célula de Bateria (4.18V OK). Nenhum defeito físico encontrado!`,
+            { showAiCard: false }
           );
         }
       }, 540);
@@ -2533,39 +2639,257 @@
     let currentUacTaskKey = 'ram';
     const BOT_UAC_TASKS = {
       ram: {
-        title: "⚡ Permissão: Task Kill RAM (Gerenciador PC)",
-        desc: "Você autoriza o Chat Bot a encerrar processos travados em segundo plano para liberar Memória RAM imediatamente?",
+        btnLabel: "🤖 IA: Liberar Memória RAM Por Mim",
+        title: "⚡ Permissão: Task Kill RAM pela IA",
+        desc: "Você autoriza a IA do HelpTop a encerrar processos travados em segundo plano e liberar Memória RAM por você?",
         cmd: "am kill-all && sync && echo 3 > drop_caches",
         steps: [
           "Encerrar 18 processos ociosos na memória RAM",
           "Reduzir temperatura do processador em ~4.5°C",
           "Preservar aplicativos de mensagens ativos"
         ],
-        manualGuide: "<strong>Passo a Passo Manual (Task Kill RAM):</strong> Vá em <em>Configurações &rarr; Assistência do Aparelho &rarr; Memória (RAM)</em> e toque em <strong>Limpar Agora</strong>."
+        manualGuide: "<strong>📖 Passo a Passo Manual (Task Kill RAM):</strong><br>1. Vá em <em>Configurações &rarr; Assistência do Aparelho (ou Sobre o Dispositivo) &rarr; Memória (RAM)</em>.<br>2. Toque em <strong>Limpar Agora</strong> para encerrar processos ocultos.<br>3. Feche os aplicativos abertos tocando no botão de <strong>Recentes (quadrado)</strong> na barra inferior."
+      },
+      ram_plus: {
+        btnLabel: "🤖 IA: Desativar RAM Plus Por Mim",
+        title: "🚀 Permissão: Desativar RAM Plus (Memória Virtual) pela IA",
+        desc: "Você autoriza a IA do HelpTop a entrar nas configurações do sistema e desligar a expansão de RAM virtual (RAM Plus) para eliminar engasgos de leitura?",
+        cmd: "settings put global ram_expand_size 0 && sysctl -w vm.swappiness=10",
+        steps: [
+          "Acessar menu de Memória Virtual / RAM Plus do sistema",
+          "Desativar alocação de armazenamento lento (Swap/RAM Plus)",
+          "Priorizar leitura direta na memória RAM física de alta velocidade"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Desativar RAM Plus):</strong><br>1. Abra as <em>Configurações</em> do aparelho.<br>2. Acesse o menu de memória (Ex: <em>Sobre o Dispositivo &rarr; RAM</em> no Realme, <em>Assistência do Aparelho &rarr; Memória &rarr; RAM Plus</em> no Samsung, ou <em>Configurações Adicionais &rarr; Extensão de Memória</em> no Xiaomi).<br>3. Desative a chave de <strong>Expansão de RAM / RAM Plus</strong> e reinicie o celular."
+      },
+      gaming: {
+        btnLabel: "🤖 IA: Otimizar para Jogos Pesados Por Mim",
+        title: "🎮 Permissão: Otimização de Jogos (FPS Boost) pela IA",
+        desc: "Você autoriza a IA do HelpTop a desativar a RAM virtual, liberar a memória gráfica (VRAM) e aplicar o perfil de desempenho máximo para jogos?",
+        cmd: "cmd game_mode performance && settings put global ram_expand_size 0 && am kill-all",
+        steps: [
+          "Desativar RAM Plus / Memória Virtual que causa quedas de FPS",
+          "Executar Task Kill RAM liberando a placa gráfica (GPU/VRAM)",
+          "Estabilizar clock do processador e resfriar a CPU"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Otimização para Jogos):</strong><br>1. Desative a RAM virtual em <em>Configurações &rarr; Sobre o Dispositivo / Memória &rarr; RAM</em> e reinicie o celular.<br>2. Antes de abrir o jogo, feche todos os apps em 2º plano ou use o botão <strong>⚡ Task Kill RAM</strong>.<br>3. Nunca jogue com o carregador conectado (o calor reduz o clock do processador pela metade)."
+      },
+      animations: {
+        btnLabel: "🤖 IA: Ajustar Escala 0,5x Por Mim",
+        title: "⚡ Permissão: Ajustar Escala de Animação 0,5x pela IA",
+        desc: "Você autoriza a IA do HelpTop a habilitar as Opções do Desenvolvedor e alterar automaticamente as 3 escalas de animação de 1x para 0,5x?",
+        cmd: "settings put global window_animation_scale 0.5 && settings put global transition_animation_scale 0.5 && settings put global animator_duration_scale 0.5",
+        steps: [
+          "Habilitar Opções do Desenvolvedor no sistema Android",
+          "Alterar Escala de animação da janela e de transição de 1x para 0,5x",
+          "Alterar Escala de duração do animador para 0,5x (resposta 2x mais rápida)"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Escala de Animação 0,5x):</strong><br>1. Vá em <em>Configurações &rarr; Sobre o telefone</em> e toque 7 vezes em <strong>Número da versão (ou Número de compilação)</strong> até liberar o modo desenvolvedor.<br>2. Volte em <em>Configurações &rarr; Sistema &rarr; Opções do desenvolvedor</em>.<br>3. Altere <strong>Escala de animação da janela</strong>, <strong>Escala de transição</strong> e <strong>Escala de duração do animador</strong> de <code>1x</code> para <code>0,5x</code>."
+      },
+      screen_smooth: {
+        btnLabel: "🤖 IA: Ativar Tela Fluida e Rolagem Rápida Por Mim",
+        title: "📱 Permissão: Ativar Taxa 90Hz/120Hz e Limpar Atraso de Rolagem",
+        desc: "Você autoriza a IA do HelpTop a configurar a taxa de atualização da tela para fluidez máxima e desativar monitoramentos de acessibilidade que atrasam a rolagem?",
+        cmd: "settings put system peak_refresh_rate 120.0 && settings put secure enabled_accessibility_services null",
+        steps: [
+          "Ajustar taxa de atualização da tela de 60Hz para Automática / 90Hz / 120Hz",
+          "Desativar serviços de leitura de tela em Acessibilidade que geram lag",
+          "Otimizar fluidez de rolagem na tela inicial e redes sociais"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Fluidez na Tela e Redes Sociais):</strong><br>1. Vá em <em>Configurações &rarr; Tela &rarr; Taxa de atualização</em> e mude de 60Hz para <strong>Automática / 90Hz / 120Hz</strong>.<br>2. Vá em <em>Configurações &rarr; Acessibilidade &rarr; Aplicativos instalados</em> e desative apps que tenham permissão de leitura de tela."
+      },
+      hidden_perf: {
+        btnLabel: "🤖 IA: Destravar Bateria e Acessibilidade Por Mim",
+        title: "🔓 Permissão: Destravar Desempenho (Bateria + Acessibilidade)",
+        desc: "Você autoriza a IA do HelpTop a desligar a Economia de Bateria (que limita o processador a 60%) e desativar permissões de Acessibilidade de apps em 2º plano?",
+        cmd: "settings put global low_power 0 && settings put secure enabled_accessibility_services null && settings put global window_animation_scale 0.5",
+        steps: [
+          "Desativar Economia de Bateria para liberar 100% da velocidade da CPU e Hz da tela",
+          "Desativar monitoramentos de toque de apps de terceiros em Acessibilidade",
+          "Garantir escalas de animação em 0,5x para abertura instantânea de apps"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Destravar Desempenho Oculto):</strong><br>1. Vá em <em>Configurações &rarr; Bateria</em> e desative a <strong>Economia de Bateria</strong> (ela limita o processador a ~60% e trava a tela em 60Hz).<br>2. Vá em <em>Configurações &rarr; Acessibilidade</em> e desative antivírus extras ou limpadores de terceiros que monitoram cada toque.<br>3. Em <em>Opções do desenvolvedor</em>, deixe as escalas de animação em <code>0,5x</code>."
+      },
+      storage: {
+        btnLabel: "🤖 IA: Limpar Caches e Liberar Espaço Por Mim",
+        title: "🧹 Permissão: Limpeza Automática de Cache e Armazenamento",
+        desc: "Você autoriza a IA do HelpTop a remover 1.8 GB de caches ocultos de redes sociais, arquivos temporários e lixeira sem tocar nas suas fotos ou conversas?",
+        cmd: "pm trim-caches 4096M && rm -rf /sdcard/Android/data/*/cache/*",
+        steps: [
+          "Limpar 1.8 GB de caches ocultos de WhatsApp, Instagram, TikTok e Chrome",
+          "Remover arquivos temporários (.tmp) e instaladores antigos (.apk)",
+          "Preservar 100% das suas fotos, vídeos pessoais e conversas"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Liberar Armazenamento):</strong><br>1. No <em>WhatsApp &rarr; Configurações &rarr; Armazenamento e dados &rarr; Gerenciar armazenamento</em>, apague vídeos pesados repetidos.<br>2. Em <em>Configurações &rarr; Aplicativos</em>, entre nos apps mais pesados (Instagram, TikTok, Chrome) e toque em <em>Armazenamento &rarr; Limpar Cache</em>.<br>3. Esvazie a aba <em>Biblioteca &rarr; Lixeira</em> do Google Fotos / Galeria."
+      },
+      app_crash: {
+        btnLabel: "🤖 IA: Corrigir Aplicativo Fechando Por Mim",
+        title: "🛠️ Permissão: Reparar Fechamento de Apps e WebView pela IA",
+        desc: "Você autoriza a IA do HelpTop a limpar o cache corrompido do aplicativo, sincronizar Data e Hora Automáticas e atualizar o motor Android System WebView?",
+        cmd: "pm clear-cache && cmd webviewupdate enable-multiprocess && settings put global auto_time 1",
+        steps: [
+          "Limpar cache corrompido do aplicativo sem apagar sua conta ou conversas",
+          "Sincronizar Data e Hora Automáticas e motor Android System WebView",
+          "Liberar memória RAM e gráfica (VRAM) para evitar fechamento súbito"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Corrigir App Fechando):</strong><br>1. Segure o dedo no ícone do aplicativo &rarr; toque em <strong>Informações (i)</strong> &rarr; <em>Armazenamento e cache</em> &rarr; <strong>Limpar Cache</strong>.<br>2. Abra a Play Store, busque por <strong>Android System WebView</strong> e toque em <strong>Atualizar</strong>.<br>3. Em <em>Configurações &rarr; Sistema &rarr; Data e hora</em>, ative <strong>Data e hora automáticas</strong> e reinicie o celular."
+      },
+      battery_heat: {
+        btnLabel: "🤖 IA: Resfriar Celular e Otimizar Bateria Por Mim",
+        title: "❄️ Permissão: Resfriamento da CPU e Economia de Energia pela IA",
+        desc: "Você autoriza a IA do HelpTop a desligar buscas ocultas de Wi-Fi/Bluetooth e restringir aplicativos que estão esquentando o processador em 2º plano?",
+        cmd: "settings put global wifi_scan_always_enabled 0 && settings put global ble_scan_always_enabled 0 && am kill-all",
+        steps: [
+          "Desligar Busca por Wi-Fi e Busca por Bluetooth ocultas na Localização",
+          "Restringir apps que drenam bateria e aquecem a CPU em 2º plano",
+          "Reduzir temperatura do aparelho para ~36.4°C imediatamente"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Resfriar e Economizar Bateria):</strong><br>1. Vá em <em>Configurações &rarr; Localização &rarr; Serviços de localização</em> e desligue <strong>Busca por Wi-Fi</strong> e <strong>Busca por Bluetooth</strong>.<br>2. Em <em>Configurações &rarr; Bateria &rarr; Uso da bateria</em>, selecione os apps que mais consomem e marque <strong>Restrito em 2º plano</strong>.<br>3. Encerre processos travados usando o <strong>⚡ Task Kill RAM</strong>."
       },
       dns: {
-        title: "📶 Permissão: Flush DNS e Reparo de Rede",
-        desc: "Você autoriza limpar o cache de resolução DNS e renovar os sockets de conectividade Wi-Fi/4G?",
+        btnLabel: "🤖 IA: Reparar Wi-Fi / Rede e DNS Por Mim",
+        title: "📶 Permissão: Flush DNS e Reparo de Rede pela IA",
+        desc: "Você autoriza a IA do HelpTop a limpar o cache de resolução DNS, redefinir os pontos de acesso (APN) e renovar os sockets de conectividade Wi-Fi/4G?",
         cmd: "ndc resolver flushdefaultif && ipconfig /flushdns",
         steps: [
           "Limpar tabela de cache DNS corrompida",
-          "Renovar concessão de IP local e rota de gateway",
+          "Renovar concessão de IP local e rota de gateway (APN)",
           "Testar latência com servidor DNS 8.8.8.8 (14ms)"
         ],
-        manualGuide: "<strong>Passo a Passo Manual (Rede/DNS):</strong> Ative o <em>Modo Avião</em> por 15 segundos ou vá em <em>Configurações &rarr; Gerenciamento Geral &rarr; Restaurar configurações de rede</em>."
+        manualGuide: "<strong>📖 Passo a Passo Manual (Rede/DNS):</strong><br>1. Ative o <em>Modo Avião</em> por 15 segundos e desligue em seguida.<br>2. Em <em>Configurações &rarr; Rede e Internet &rarr; DNS Privado</em>, configure <code>dns.google</code>.<br>3. Para 4G/5G, vá em <em>Configurações &rarr; Rede Móvel &rarr; Pontos de Acesso (APN)</em> e toque em <strong>Redefinir para o padrão</strong>."
+      },
+      bluetooth: {
+        btnLabel: "🤖 IA: Reparar Conexão Bluetooth Por Mim",
+        title: "🎧 Permissão: Redefinir Controlador Bluetooth pela IA",
+        desc: "Você autoriza a IA do HelpTop a limpar o cache do sistema Bluetooth e reiniciar o controlador de pareamento sem apagar seus arquivos?",
+        cmd: "pm clear com.android.bluetooth && svc bluetooth disable && svc bluetooth enable",
+        steps: [
+          "Limpar cache corrompido do serviço de Bluetooth do Android",
+          "Reiniciar módulo de áudio sem fio e tabela de pareamento",
+          "Estabilizar conexão contra cortes e falhas de reconhecimento"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Corrigir Bluetooth):</strong><br>1. Vá em <em>Configurações &rarr; Dispositivos conectados</em>, toque na engrenagem do fone/caixa e escolha <strong>Esquecer</strong>.<br>2. Vá em <em>Configurações &rarr; Gerenciamento Geral (ou Sistema) &rarr; Restaurar &rarr; Redefinir configurações de Wi-Fi e Bluetooth</em>.<br>3. Pareie o dispositivo novamente."
       },
       adware: {
-        title: "🛡️ Permissão: Scanner de Adware e Pop-ups",
-        desc: "Você autoriza revogar a permissão de sobreposição de tela de aplicativos suspeitos que exibem propagandas sozinhas?",
+        btnLabel: "🤖 IA: Remover Pop-ups e Adware Por Mim",
+        title: "🛡️ Permissão: Scanner de Adware e Pop-ups pela IA",
+        desc: "Você autoriza a IA do HelpTop a revogar a permissão de sobreposição de tela de aplicativos suspeitos que exibem propagandas sozinhas?",
         cmd: "appops set --uid suspicious_pkg SYSTEM_ALERT_WINDOW deny",
         steps: [
           "Bloquear janelas pop-up de anúncios em 2º plano",
-          "Limpar cache de redirecionamento do navegador",
+          "Limpar cache de redirecionamento e notificações de spam do navegador",
           "Isolar pacotes instalados recentemente sem assinatura"
         ],
-        manualGuide: "<strong>Passo a Passo Manual (Anti-Adware):</strong> Vá em <em>Configurações &rarr; Aplicativos &rarr; Acesso Especial &rarr; Sobrepor a outros apps</em> e desative apps desconhecidos."
+        manualGuide: "<strong>📖 Passo a Passo Manual (Anti-Adware):</strong><br>1. Vá em <em>Configurações &rarr; Aplicativos &rarr; Acesso Especial &rarr; Sobrepor a outros apps</em> e desative apps desconhecidos.<br>2. No <em>Chrome &rarr; Configurações &rarr; Configurações do site &rarr; Notificações</em>, remova sites estranhos.<br>3. Desinstale apps de limpeza falsa ou lanterna instalados recentemente."
+      },
+      audio: {
+        btnLabel: "🤖 IA: Calibrar Som e Limpar Alto-Falante Por Mim",
+        title: "🔊 Permissão: Calibração de Áudio e Onda 880Hz pela IA",
+        desc: "Você autoriza a IA do HelpTop a desconectar áudio preso no Bluetooth, calibrar os canais de som e emitir a onda acústica de 880Hz?",
+        cmd: "audio_policy --reset-routing && media volume --stream 3 --set 15 && speaker_clean --freq 880",
+        steps: [
+          "Desconectar roteamento de áudio preso em fones Bluetooth",
+          "Emitir onda sonora de 880Hz para limpeza acústica do alto-falante",
+          "Restaurar volume de mídia e permissão de microfone"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Som e Microfone):</strong><br>1. Desligue o <strong>Bluetooth</strong> nas configurações rápidas para garantir que o som não está indo para outro aparelho.<br>2. Passe uma escova macia e seca na saída inferior do alto-falante.<br>3. Verifique em <em>Configurações &rarr; Aplicativos &rarr; Permissões</em> se o acesso ao <strong>Microfone</strong> está permitido."
+      },
+      touch: {
+        btnLabel: "🤖 IA: Calibrar Toque na Tela (Touch) Por Mim",
+        title: "👆 Permissão: Recalibração de Touch e Sensibilidade pela IA",
+        desc: "Você autoriza a IA do HelpTop a ativar a Alta Sensibilidade do Toque e recalibrar a matriz capacitiva do display?",
+        cmd: "settings put system touch_sensitivity 1 && input_calibration --reset-matrix",
+        steps: [
+          "Ativar modo de Sensibilidade do Toque nas configurações de Tela",
+          "Recalibrar matriz capacitiva para eliminar toques fantasmas",
+          "Reduzir atraso de leitura de toque (input lag) para zero"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Falha no Touch / Toque Fantasma):</strong><br>1. Desconecte o celular do carregador (fontes paralelas causam toque fantasma na tela).<br>2. Limpe a tela com um pano seco e vá em <em>Configurações &rarr; Tela</em> para ativar <strong>Sensibilidade do toque</strong>.<br>3. Use o botão <strong>🩺 Testar Sensores &rarr; Testar Touch</strong> no topo para validar o display."
+      },
+      camera: {
+        btnLabel: "🤖 IA: Reparar e Reiniciar Câmera Por Mim",
+        title: "📷 Permissão: Reiniciar Motor da Câmera pela IA",
+        desc: "Você autoriza a IA do HelpTop a limpar o cache do app Câmera, encerrar apps que prendem a lente e reiniciar o servidor óptico?",
+        cmd: "pm clear-cache com.android.camera && killall cameraserver",
+        steps: [
+          "Limpar cache corrompido do aplicativo nativo de Câmera",
+          "Liberar permissão da lente presa por apps em 2º plano",
+          "Reiniciar serviço óptico (CameraServer) e destravar foco"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Reparar Câmera):</strong><br>1. Segure o dedo no ícone do app <strong>Câmera</strong> &rarr; <em>Informações do app (i) &rarr; Armazenamento &rarr; Limpar Cache</em> e toque em <strong>Forçar parada</strong>.<br>2. Feche apps que usam vídeo em 2º plano (WhatsApp, Instagram) e abra a câmera novamente."
+      },
+      charging: {
+        btnLabel: "🤖 IA: Ativar Carregamento Rápido e Calibrar Carga Por Mim",
+        title: "🔌 Permissão: Ativar Carregamento Rápido (Fast Charge) pela IA",
+        desc: "Você autoriza a IA do HelpTop a ativar o Carregamento Rápido nas configurações de bateria e recalibrar o controlador USB-C?",
+        cmd: "settings put system adaptive_fast_charging 1 && dumpsys battery reset",
+        steps: [
+          "Ativar chave de Carregamento Rápido (Turbo/Fast Charge) no sistema",
+          "Recalibrar controlador de tensão da bateria (4.18V)",
+          "Limpar bloqueio de porta USB por falso alerta de umidade"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Carregamento Lento / Mau Contato):</strong><br>1. Com o aparelho desligado, remova fiapos de poeira da entrada USB-C usando um palito de madeira ou plástico (nunca metal).<br>2. Vá em <em>Configurações &rarr; Bateria &rarr; Configurações de carregamento</em> e ative <strong>Carregamento rápido</strong>."
+      },
+      reboot: {
+        btnLabel: "🤖 IA: Corrigir Reinício Automático Por Mim",
+        title: "🔄 Permissão: Desativar Reinício Automático e Reparar Sistema",
+        desc: "Você autoriza a IA do HelpTop a desativar o Reinício Automático Programado e reparar conflitos de energia do sistema?",
+        cmd: "settings put system auto_restart_enabled 0 && fsck_system_cache --repair",
+        steps: [
+          "Desativar opção de Reinício Automático Programado nas configurações",
+          "Reparar partição de cache do sistema e conflitos de kernel",
+          "Recalibrar leitura de porcentagem da bateria"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Celular Reiniciando Sozinho):</strong><br>1. Retire a capinha e pressione o botão Power várias vezes para garantir que não está preso.<br>2. Vá em <em>Configurações &rarr; Assistência do Aparelho (ou Sistema)</em> e desative a opção <strong>Reinício automático programado</strong>."
+      },
+      isolation_mode: {
+        btnLabel: "🤖 IA: Isolar Apps em Conflito Por Mim",
+        title: "🔍 Permissão: Isolamento de Conflitos (Modo Seguro pela IA)",
+        desc: "Você autoriza a IA do HelpTop a isolar e pausar aplicativos de terceiros que estão entrando em conflito com o Android?",
+        cmd: "pm list packages -3 --check-conflicts && am kill-all",
+        steps: [
+          "Analisar e pausar aplicativos de terceiros em conflito com o sistema",
+          "Bloquear inicialização oculta de processos travados",
+          "Restaurar estabilidade do Android sem apagar dados pessoais"
+        ],
+        manualGuide: "<strong>📖 Passo a Passo Manual (Modo de Segurança):</strong><br>1. Segure o botão físico de <strong>Desligar</strong> por 2 segundos.<br>2. Na tela, toque e segure sobre o botão vermelho <em>Desligar</em> até aparecer <strong>Modo de Segurança</strong> e confirme.<br>3. Desinstale o último aplicativo baixado antes do problema começar."
       }
     };
+
+    function resolveDefaultUacTaskForTopic(topic) {
+      const map = {
+        slow: 'ram_plus',
+        gaming: 'gaming',
+        animations: 'animations',
+        screen_smooth: 'screen_smooth',
+        hidden_perf: 'hidden_perf',
+        storage: 'storage',
+        app_crash: 'app_crash',
+        battery_heat: 'battery_heat',
+        network: 'dns',
+        bluetooth: 'bluetooth',
+        adware: 'adware',
+        audio: 'audio',
+        touch: 'touch',
+        camera: 'camera',
+        charging: 'charging',
+        reboot: 'reboot',
+        sensors: 'touch',
+        general: 'ram'
+      };
+      return map[topic] || 'ram';
+    }
+
+    function showBotManualGuideForTask(taskKey = 'ram') {
+      const cfg = BOT_UAC_TASKS[taskKey] || BOT_UAC_TASKS.ram;
+      appendBotMessage(
+        `${cfg.manualGuide}<br><br><span class="text-[10px] text-gray-600">💡 <em>Se preferir não fazer manualmente, clique no botão abaixo para a IA aplicar esse ajuste por você!</em></span>`,
+        {
+          uacTask: taskKey,
+          hideManualGuideBtn: true
+        }
+      );
+    }
 
     function openBotUacModal(taskKey = 'ram') {
       currentUacTaskKey = taskKey;
@@ -2586,30 +2910,52 @@
       closeBotUacModal();
       const cfg = BOT_UAC_TASKS[currentUacTaskKey] || BOT_UAC_TASKS.ram;
       if (!authorized) {
-        appendBotMessage(cfg.manualGuide);
+        showBotManualGuideForTask(currentUacTaskKey);
         return;
       }
 
       runConsoleExecution(
         cfg.title,
         [
-          `Executando: ${cfg.cmd}`,
+          `Executando pela IA: ${cfg.cmd}`,
           ...cfg.steps
         ],
         () => {
           demoState.metrics.ram = 46;
           demoState.metrics.ramUsed = 2.8;
+          if (currentUacTaskKey === 'storage') {
+            demoState.metrics.storage = 75;
+            demoState.metrics.storageUsed = 96;
+          }
           demoState.metrics.temp = 36.4;
           demoState.metrics.performance = 96;
           demoState.metrics.isCritical = false;
 
+          if (currentUacTaskKey === 'audio') {
+            runSingleSensorTest('audio');
+          } else if (currentUacTaskKey === 'touch') {
+            runSingleSensorTest('touch');
+          } else if (currentUacTaskKey === 'dns') {
+            runSingleSensorTest('net');
+          } else if (currentUacTaskKey === 'charging' || currentUacTaskKey === 'battery_heat') {
+            runSingleSensorTest('bat');
+          }
+
           addAuditLogEntry(
             'PÓS-ANÁLISE',
-            `${cfg.title} autorizado e concluído no Chat Bot (RAM: 46%, Desempenho: 96%).`
+            `${cfg.title} autorizado e concluído pela IA no Chat Bot (RAM: 46%, Desempenho: 96%).`
           );
           syncUiMetrics();
+          const stepsDoneHtml = cfg.steps.map(s => `• ${s}`).join('<br>');
           appendBotMessage(
-            `✓ <strong>Procedimento Executado com Sua Permissão!</strong> O comando <code>${cfg.cmd}</code> foi concluído com sucesso. Sua memória RAM caiu para <strong>46%</strong>, a temperatura estabilizou em <strong>36.4°C</strong> e o registro já consta no Histórico!`
+            `✅ <strong>Pronto! A IA entrou no sistema e fez o ajuste por você!</strong><br><br>
+            <strong>O que a IA executou automaticamente:</strong><br>
+            ${stepsDoneHtml}<br><br>
+            📊 <strong>Resultado:</strong> Memória RAM em <strong>${demoState.metrics.ram}%</strong>, temperatura estabilizada em <strong>${demoState.metrics.temp.toFixed(1)}°C</strong> e desempenho elevado para <strong>${demoState.metrics.performance}%</strong>!<br><br>
+            <div class="p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-700">
+              ${cfg.manualGuide}
+            </div>`,
+            { showAiCard: false }
           );
         }
       );
@@ -3473,7 +3819,7 @@
         removeTypingIndicator();
         appendBotMessage(
           `Olá! Sou o assistente técnico do <strong>HelpTop</strong>. Me conta o que está acontecendo com o seu aparelho ou qual é a sua dúvida!`,
-          { showSupportFooter: false }
+          { showSupportFooter: false, showAiCard: false }
         );
       }, 500);
     }
@@ -3502,7 +3848,7 @@
       if (demoState.currentScreen === 'chat') {
         appendBotMessage(
           `✓ <strong>Leitura Local Atualizada:</strong> Sincronizei os dados liberados pelo navegador (RAM base: <strong>${demoState.metrics.ramTotal.toFixed(1)} GB</strong> • Energia: <strong>${demoState.metrics.batteryDrain}</strong>).`,
-          { showSupportFooter: false }
+          { showSupportFooter: false, showAiCard: false }
         );
       }
     }
@@ -3554,9 +3900,44 @@
       if (!container) return;
       const showSupportFooter = options.showSupportFooter !== undefined ? options.showSupportFooter : true;
       const quickReplies = Array.isArray(options.quickReplies) ? options.quickReplies : [];
+      const showAiCard = options.showAiCard !== undefined ? options.showAiCard : true;
+
+      let resolvedTaskKey = options.uacTask || null;
+      if (!resolvedTaskKey && showAiCard) {
+        resolvedTaskKey = resolveDefaultUacTaskForTopic(botContext.lastTopic);
+      }
+      if (resolvedTaskKey) {
+        currentUacTaskKey = resolvedTaskKey;
+      }
+
+      const taskCfg = resolvedTaskKey ? (BOT_UAC_TASKS[resolvedTaskKey] || BOT_UAC_TASKS.ram) : null;
+      const aiBtnLabel = options.uacBtnLabel || (taskCfg ? taskCfg.btnLabel : "🤖 Deixar a IA Fazer Isso Por Mim");
 
       const div = document.createElement('div');
       div.className = "bg-white border border-gray-300 rounded-2xl rounded-tl-none p-2.5 mr-4 text-gray-800 space-y-2 shadow-sm";
+
+      let aiActionCardHtml = '';
+      if (showAiCard && resolvedTaskKey) {
+        const manualBtnHtml = options.hideManualGuideBtn ? '' : `
+          <button type="button" onclick="showBotManualGuideForTask('${resolvedTaskKey}')" class="w-full py-1 px-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded font-semibold text-[10px] transition">
+            📖 Ver Passo a Passo Manual Detalhado
+          </button>
+        `;
+        aiActionCardHtml = `
+          <div class="p-2 bg-blue-50/90 border border-blue-200 rounded-lg space-y-1.5 mt-1.5">
+            <div class="text-[10px] font-bold text-blue-900 flex items-center gap-1">
+              <span>🤖</span>
+              <span>Quer que a IA entre e faça isso por você ou prefere o passo a passo manual?</span>
+            </div>
+            <div class="flex flex-col gap-1">
+              <button type="button" onclick="openBotUacModal('${resolvedTaskKey}')" class="w-full py-1.5 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[11px] shadow-sm transition flex items-center justify-center gap-1">
+                <span>${aiBtnLabel} (Automático)</span>
+              </button>
+              ${manualBtnHtml}
+            </div>
+          </div>
+        `;
+      }
 
       let chipsHtml = '';
       if (quickReplies.length > 0) {
@@ -3581,6 +3962,7 @@
 
       div.innerHTML = `
         <div class="leading-relaxed"><strong>Chat Bot:</strong> ${text}</div>
+        ${aiActionCardHtml}
         ${chipsHtml}
         ${footerHtml}
       `;
@@ -3662,11 +4044,19 @@
 
       const isAffirmative = /^(sim|s|isso|quero|pode|claro|bora|ok|beleza|por favor|pfv|explica|mostra|como faz|como faco|ensina|vamos|aceito)\b/.test(norm) && norm.split(/\s+/).length <= 5;
       const isNegative = /^(nao|n|agora nao|depois|deixa|ja fiz)\b/.test(norm) && norm.split(/\s+/).length <= 4;
-      const isStillBroken = /\b(nao resolveu|nao funcionou|continua|ainda ta|ainda esta|ja fiz isso|nao adiantou|mesma coisa|persiste|piorou)\b/.test(norm);
+      const isStillBroken = /\b(nao resolveu|nao funcionou|continua|ainda ta|ainda esta|ja fiz isso|nao adiantou|mesma coisa|persiste|piorou|ainda mexer|continua lento|ainda lento)\b/.test(norm);
+      const isAskAiAutoDo = /\b(faz pra mim|faca pra mim|voce faz|faz ai|entra e faz|ia faz|deixar a ia|fazer automatico|automatico pela ia|aplica pra mim|corrige pra mim|desativa pra mim|pode fazer por mim)\b/.test(norm);
       const mentionedApp = extractAppMentioned(norm);
 
       setTimeout(() => {
         removeTypingIndicator();
+
+        // Se o usuário pedir diretamente para a IA entrar e fazer por ele (em qualquer situação)
+        if (isAskAiAutoDo) {
+          const targetTask = currentUacTaskKey || resolveDefaultUacTaskForTopic(botContext.lastTopic);
+          openBotUacModal(targetTask);
+          return;
+        }
 
         // =====================================================================
         // A. TRATAMENTO DE RESPOSTAS CURTAS CONTEXTUAIS (QUANDO O BOT FEZ UMA PERGUNTA)
@@ -3677,27 +4067,32 @@
 
           if (isNegative) {
             appendBotMessage(
-              `Sem problemas! Se quiser testar outra ferramenta ou tiver outra dúvida sobre o ${userDevice}, é só me dizer.`,
-              { showSupportFooter: false }
+              `Sem problemas! Se quiser que a IA faça algum ajuste por você ou preferir o passo a passo manual para outra função do ${userDevice}, é só me dizer.`,
+              { showSupportFooter: false, showAiCard: false }
             );
             return;
           }
 
           if (pending === 'offer_animations') {
             botContext.lastTopic = 'animations';
+            botContext.usedResponseKeys.add('animations_shown');
             appendBotMessage(
-              `Veja como deixar as janelas do <strong>${userDevice}</strong> 2x mais rápidas:<br><br>
+              `Veja como deixar as janelas do <strong>${userDevice}</strong> 2x mais rápidas (<strong>Passo a Passo Manual</strong>):<br><br>
               1. Vá em <em>Configurações &rarr; Sobre o telefone</em> e toque 7 vezes em <strong>Número da versão</strong> até liberar o modo desenvolvedor.<br>
               2. Volte em <em>Configurações &rarr; Sistema &rarr; Opções do desenvolvedor</em>.<br>
               3. Altere <strong>Escala de animação da janela</strong>, <strong>transição</strong> e <strong>duração do animador</strong> de <code>1x</code> para <code>0,5x</code>.<br><br>
-              A resposta ao toque fica instantânea na hora!`,
-              { showSupportFooter: false }
+              A resposta ao toque fica instantânea na hora! Se preferir, posso entrar e aplicar o <code>0,5x</code> por você agora mesmo:`,
+              {
+                uacTask: 'animations',
+                hideManualGuideBtn: true,
+                showSupportFooter: true
+              }
             );
             return;
           }
 
           if (pending === 'offer_human_support') {
-            appendBotMessage(`Perfeito! Gerei seu protocolo abaixo. Copie o código e envie na tela do Suporte Humano:`, { showSupportFooter: false });
+            appendBotMessage(`Perfeito! Gerei seu protocolo abaixo. Copie o código e envie na tela do Suporte Humano:`, { showSupportFooter: false, showAiCard: false });
             generateSupportProtocolInChat();
             return;
           }
@@ -3720,14 +4115,16 @@
             botContext.lastTopic = 'gaming';
             appendBotMessage(
               `Em <strong>jogos</strong>, quedas de FPS acontecem quando a memória virtual (RAM Plus) usa o armazenamento lento ou quando o aparelho passa de 40°C.<br><br>
-              ✅ <strong>Para rodar liso sem engasgar:</strong><br>
+              ✅ <strong>Passo a Passo Manual para rodar liso sem engasgar:</strong><br>
               1. Desative a RAM virtual em <em>${brandInfo.ramPlusMenu}</em> e reinicie o celular.<br>
               2. Antes de abrir o jogo, use o botão <strong>⚡ Task Kill RAM</strong> lá no topo para liberar a placa gráfica.<br>
               3. Nunca jogue com o carregador conectado (o calor reduz o clock do processador pela metade).<br><br>
-              Quer que eu te mostre também o ajuste de desenvolvedor que reduz o atraso do toque (input lag)?`,
+              Quer que a IA aplique essa otimização de jogos por você agora ou quer ver também o ajuste de desenvolvedor (<code>0,5x</code>) que reduz o atraso do toque?`,
               {
+                uacTask: 'gaming',
                 quickReplies: [
-                  { label: "✓ Sim, mostrar ajuste", prompt: "Sim, quero ver" },
+                  { label: "✓ Sim, mostrar ajuste 0,5x", prompt: "Sim, quero ver" },
+                  { label: "🤖 IA: Fazer Isso Por Mim", prompt: "Faz pra mim" },
                   { label: "⚡ Abrir Task Kill RAM", prompt: "Executar Task Kill RAM" }
                 ]
               }
@@ -3736,15 +4133,18 @@
           }
           if (norm.match(/\b(tela|inicial|redes|sociais|normal|dia a dia|rolar|aberturas|geral|tudo)\b/)) {
             botContext.pendingQuestion = 'offer_animations';
-            botContext.lastTopic = 'slow';
+            botContext.lastTopic = 'screen_smooth';
             appendBotMessage(
-              `Quando o engasgo é ao <strong>rolar a tela inicial ou redes sociais</strong> (mesmo com RAM boa), o culpado costuma ser a taxa de atualização da tela ou atraso de animação do sistema:<br><br>
+              `Quando o engasgo é ao <strong>rolar a tela inicial ou redes sociais</strong> (mesmo com RAM boa), o culpado costuma ser a taxa de atualização da tela ou atraso de animação do sistema.<br><br>
+              ✅ <strong>Passo a Passo Manual:</strong><br>
               1. Em <em>Configurações &rarr; Tela &rarr; Taxa de atualização</em>, mude de 60Hz para <strong>Automática / 90Hz / 120Hz</strong>.<br>
               2. Em <em>Configurações &rarr; Acessibilidade &rarr; Aplicativos instalados</em>, desative apps que tenham permissão de leitura de tela (eles atrasam cada rolagem).<br><br>
-              Quer que eu te ensine a deixar a abertura de telas 2x mais rápida reduzindo a escala de animação para <code>0,5x</code>?`,
+              Você pode deixar a IA fazer esse ajuste por você abaixo ou pedir para eu ensinar como reduzir a escala de animação para <code>0,5x</code>:`,
               {
+                uacTask: 'screen_smooth',
                 quickReplies: [
-                  { label: "🚀 Sim, ensinar 0,5x", prompt: "Sim, me ensina" }
+                  { label: "🚀 Sim, ensinar 0,5x", prompt: "Sim, me ensina" },
+                  { label: "🤖 IA: Fazer Isso Por Mim", prompt: "Faz pra mim" }
                 ]
               }
             );
@@ -3755,32 +4155,38 @@
         // Resposta contextual quando o bot perguntou "Qual aplicativo está fechando?"
         if (botContext.pendingQuestion === 'ask_crashing_app' && (mentionedApp || norm.split(/\s+/).length <= 4)) {
           botContext.pendingQuestion = null;
+          botContext.lastTopic = 'app_crash';
           const appLabel = mentionedApp ? mentionedApp.name : raw;
           const appType = mentionedApp ? mentionedApp.type : 'generic';
 
           if (appType === 'bank') {
             appendBotMessage(
-              `Apps de banco como <strong>${appLabel}</strong> fecham sozinhos por 2 motivos específicos de segurança:<br><br>
+              `Apps de banco como <strong>${appLabel}</strong> fecham sozinhos por 2 motivos específicos de segurança.<br><br>
+              ✅ <strong>Passo a Passo Manual:</strong><br>
               1. <strong>Horário fora de sincronia:</strong> Vá em <em>Configurações &rarr; Sistema &rarr; Data e hora</em> e ative <strong>Data e hora automáticas</strong> (se estiver 1 minuto atrasado, o certificado do banco fecha o app).<br>
               2. <strong>Motor WebView desatualizado:</strong> Abra a Play Store, busque <strong>Android System WebView</strong> e clique em Atualizar.<br>
-              3. Se você tiver as <em>Opções do Desenvolvedor / Depuração USB</em> ativas, desative-as, pois apps bancários bloqueiam o acesso por segurança.`
+              3. Se você tiver as <em>Opções do Desenvolvedor / Depuração USB</em> ativas, desative-as, pois apps bancários bloqueiam o acesso por segurança.`,
+              { uacTask: 'app_crash' }
             );
             return;
           }
           if (appType === 'game') {
             appendBotMessage(
-              `Quando o <strong>${appLabel}</strong> fecha no meio da partida, o sistema encerrou o jogo por pico de memória gráfica (VRAM) ou cache de som/textura corrompido:<br><br>
+              `Quando o <strong>${appLabel}</strong> fecha no meio da partida, o sistema encerrou o jogo por pico de memória gráfica (VRAM) ou cache de som/textura corrompido.<br><br>
+              ✅ <strong>Passo a Passo Manual:</strong><br>
               1. Segure o ícone do <strong>${appLabel}</strong> &rarr; <em>Informações do app &rarr; Armazenamento e cache &rarr; Limpar Cache</em>.<br>
               2. Desative a expansão de RAM virtual (<em>${brandInfo.ramPlusMenu}</em>), que causa fechamento súbito em jogos 3D.<br>
-              3. Dentro do jogo, reduza a qualidade gráfica/sombras em 1 nível para evitar estouro de memória.`
+              3. Dentro do jogo, reduza a qualidade gráfica/sombras em 1 nível para evitar estouro de memória.`,
+              { uacTask: 'gaming' }
             );
             return;
           }
           appendBotMessage(
-            `Para corrigir o fechamento do <strong>${appLabel}</strong> sem perder sua conta ou conversas:<br><br>
+            `Para corrigir o fechamento do <strong>${appLabel}</strong> sem perder sua conta ou conversas (<strong class="text-blue-900">Passo a Passo Manual</strong>):<br><br>
             1. Segure o dedo no ícone do <strong>${appLabel}</strong> &rarr; toque no <strong>"i" (Informações)</strong> &rarr; <em>Armazenamento e cache</em> &rarr; toque apenas em <strong>Limpar Cache</strong>.<br>
             2. Na Play Store, verifique se há atualização pendente para o <strong>${appLabel}</strong> e para o <strong>Android System WebView</strong>.<br>
-            3. Reinicie o aparelho para recriar as bibliotecas temporárias do app.`
+            3. Reinicie o aparelho para recriar as bibliotecas temporárias do app.`,
+            { uacTask: 'app_crash' }
           );
           return;
         }
@@ -3791,29 +4197,32 @@
           if (norm.match(/\b(som|audio|alto|falante|microfone|volume|mudo|chiando)\b/)) {
             botContext.lastTopic = 'audio';
             appendBotMessage(
-              `Para problemas no <strong>som ou microfone</strong>:<br><br>
+              `Para problemas no <strong>som ou microfone</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
               • <strong>Som abafado/baixo:</strong> Passe uma escova macia e seca na grade inferior (poeira bloqueia até 60% da saída acústica) e verifique se o celular não ficou conectado a algum fone Bluetooth.<br>
-              • <strong>Teste de frequência:</strong> Toque em <strong>🩺 Testar Sensores &rarr; Testar Som</strong> no topo para emitir a onda de 880Hz e limpar a membrana do alto-falante.`
+              • <strong>Teste de frequência:</strong> Toque em <strong>🩺 Testar Sensores &rarr; Testar Som</strong> no topo para emitir a onda de 880Hz e limpar a membrana do alto-falante.`,
+              { uacTask: 'audio' }
             );
             return;
           }
           if (norm.match(/\b(toque|touch|tela|fantasma|display|clica sozinho|travada)\b/)) {
             botContext.lastTopic = 'touch';
             appendBotMessage(
-              `Para falha de <strong>toque na tela (ou toque fantasma)</strong>:<br><br>
+              `Para falha de <strong>toque na tela (ou toque fantasma)</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
               • <strong>Desconecte do carregador:</strong> Fontes paralelas jogam ruído elétrico na matriz capacitiva e fazem a tela clicar sozinha.<br>
               • <strong>Película ou umidade:</strong> Limpe as bordas da tela a seco e ative <em>Sensibilidade do toque</em> em <em>Configurações &rarr; Tela</em>.<br>
-              • Use o botão <strong>🩺 Testar Sensores &rarr; Testar Touch</strong> no topo para checar se há ponto cego no display.`
+              • Use o botão <strong>🩺 Testar Sensores &rarr; Testar Touch</strong> no topo para checar se há ponto cego no display.`,
+              { uacTask: 'touch' }
             );
             return;
           }
           if (norm.match(/\b(camera|foto|foco|embacada|preta|video)\b/)) {
             botContext.lastTopic = 'camera';
             appendBotMessage(
-              `Para falha na <strong>Câmera</strong> (erro ao abrir, tela preta ou foco travado):<br><br>
+              `Para falha na <strong>Câmera</strong> (erro ao abrir, tela preta ou foco travado — <strong>Passo a Passo Manual</strong>):<br><br>
               1. Segure o ícone do app <strong>Câmera</strong> &rarr; <em>Informações do app &rarr; Armazenamento &rarr; Limpar Cache</em> e depois <em>Forçar parada</em>.<br>
               2. Feche apps como WhatsApp/Instagram (às vezes eles prendem a permissão da lente em 2º plano).<br>
-              3. Se o foco não estabilizar, dê um leve toque lateral próximo ao módulo da câmera para destravar o motor óptico (OIS).`
+              3. Se o foco não estabilizar, dê um leve toque lateral próximo ao módulo da câmera para destravar o motor óptico (OIS).`,
+              { uacTask: 'camera' }
             );
             return;
           }
@@ -3822,7 +4231,7 @@
         // =====================================================================
         // B. SE O USUÁRIO DIZ "NÃO RESOLVEU / CONTINUA IGUAL / JÁ FIZ ISSO"
         // =====================================================================
-        if (isStillBroken && botContext.lastTopic) {
+        if (isStillBroken && botContext.lastTopic && !norm.match(/\b(travando|travou|trava|lento|lentidao|lerdo|demorando|engasgando|pesado|lag|desempenho|congelando)\b/)) {
           const prevTopic = botContext.lastTopic;
           botTopicCountMap[prevTopic] = (botTopicCountMap[prevTopic] || 1) + 1;
           const stage = botTopicCountMap[prevTopic];
@@ -3831,18 +4240,23 @@
             botContext.pendingQuestion = 'offer_human_support';
             appendBotMessage(
               `Entendi, se os ajustes básicos não resolveram, vamos para o <strong>diagnóstico avançado (Modo de Isolamento)</strong>:<br><br>
-              1. <strong>Teste em Modo Seguro:</strong> Segure o botão de Desligar do aparelho por 2 segundos, depois pressione e segure sobre a opção <em>"Desligar"</em> na tela até aparecer <strong>Modo de Segurança</strong>.<br>
+              1. <strong>Passo a Passo Manual (Modo Seguro):</strong> Segure o botão de Desligar do aparelho por 2 segundos, depois pressione e segure sobre a opção <em>"Desligar"</em> na tela até aparecer <strong>Modo de Segurança</strong>.<br>
               2. Se o problema sumir no Modo Seguro, a causa é algum aplicativo instalado recentemente entrando em conflito com o Android.<br><br>
-              Se mesmo assim persistir, pode ser falha física ou de firmware. Quer que eu gere um <strong>Protocolo de Suporte Humano</strong> agora para um técnico assumir seu caso ao vivo?`,
+              Você pode deixar a <strong>IA isolar os aplicativos em conflito automaticamente</strong> abaixo ou gerar um <strong>Protocolo de Suporte Humano</strong> para atendimento ao vivo:`,
               {
+                uacTask: 'isolation_mode',
                 quickReplies: [
-                  { label: "👨‍💻 Sim, chamar Suporte Humano", prompt: "Quero falar com suporte humano" }
+                  { label: "🤖 IA: Isolar Apps Por Mim", prompt: "Faz pra mim" },
+                  { label: "👨‍💻 Chamar Suporte Humano", prompt: "Quero falar com suporte humano" }
                 ]
               }
             );
             return;
           } else {
-            appendBotMessage(`Como já tentamos as etapas de sistema e o problema persiste, o ideal é acionar um técnico credenciado. Gerei seu protocolo abaixo:`);
+            appendBotMessage(
+              `Como já tentamos as etapas de sistema e o problema persiste, você ainda pode acionar o isolamento automático da IA abaixo ou falar com um técnico credenciado pelo protocolo que gerei:`,
+              { uacTask: 'isolation_mode' }
+            );
             generateSupportProtocolInChat();
             return;
           }
@@ -3859,7 +4273,7 @@
             `Boa pergunta! Por proteção de privacidade do Android (<strong>Sandbox / LGPD</strong>), navegadores web não têm permissão para ler a temperatura real da CPU nem a lista privada de processos sem um app nativo instalado.<br><br>
             Por isso os medidores iniciam com um cenário demonstrativo de diagnóstico. Mas você pode sincronizar agora mesmo os sensores que o seu navegador libera (RAM base e bateria real):<br>
             <button type="button" onclick="syncRealLocalHardwareMetrics()" class="mt-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10px] shadow-sm">🔄 Ler Sensores Permitidos pelo Navegador</button>`,
-            { showSupportFooter: false }
+            { showSupportFooter: false, showAiCard: false }
           );
           return;
         }
@@ -3867,7 +4281,7 @@
         // 2. Pedido explícito de suporte humano / técnico / protocolo
         if (norm.match(/\b(humano|atendente|tecnico|protocolo|suporte humano|falar com alguem)\b/)) {
           botContext.pendingQuestion = null;
-          appendBotMessage(`Pronto! Gerei seu protocolo de atendimento abaixo. Copie o código e cole na tela do Suporte Humano:`, { showSupportFooter: false });
+          appendBotMessage(`Pronto! Gerei seu protocolo de atendimento abaixo. Copie o código e cole na tela do Suporte Humano:`, { showSupportFooter: false, showAiCard: false });
           generateSupportProtocolInChat();
           return;
         }
@@ -3876,8 +4290,8 @@
         if (norm.match(/\b(obrigado|obrigada|valeu|show|top|ajudou|resolveu|perfeito|entendi|otimo|muito bom)\b/)) {
           botContext.pendingQuestion = null;
           appendBotMessage(
-            `Disponha, <strong>${userName}</strong>! Fico feliz em ajudar. Se precisar de mais alguma análise ou dica técnica para o seu ${userDevice}, estarei por aqui!`,
-            { showSupportFooter: false }
+            `Disponha, <strong>${userName}</strong>! Fico feliz em ajudar. Sempre que precisar que a IA faça algum ajuste automático ou quiser o passo a passo manual para o seu ${userDevice}, estarei por aqui!`,
+            { showSupportFooter: false, showAiCard: false }
           );
           return;
         }
@@ -3885,9 +4299,10 @@
         // 4. Saudações curtas
         if (norm.match(/^(oi|ola|bom dia|boa tarde|boa noite|e ai|eai|opa|tudo bem|como vai)\b/) && norm.split(/\s+/).length <= 5) {
           appendBotMessage(
-            `Olá, <strong>${userName}</strong>! Tudo certo. Qual problema ou dúvida você quer resolver no seu ${userDevice} hoje?`,
+            `Olá, <strong>${userName}</strong>! Tudo certo. Qual problema ou dúvida você quer resolver no seu ${userDevice} hoje? Posso tanto te mostrar o passo a passo manual quanto fazer o ajuste automaticamente por você!`,
             {
               showSupportFooter: false,
+              showAiCard: false,
               quickReplies: [
                 { label: "🚀 Celular lento", prompt: "Meu celular está travando muito" },
                 { label: "🔋 Bateria / Calor", prompt: "Celular esquentando e bateria descarregando" },
@@ -3912,13 +4327,14 @@
         if (norm.match(/\b(animacao|animacoes|2x mais rapido|0,5x|0\.5x|desenvolvedor|120hz|taxa de atualizacao|fluidez)\b/)) {
           botContext.lastTopic = 'animations';
           botContext.pendingQuestion = null;
+          botContext.usedResponseKeys.add('animations_shown');
           appendBotMessage(
-            `Para deixar a navegação do <strong>${userDevice}</strong> muito mais rápida:<br><br>
+            `Para deixar a navegação do <strong>${userDevice}</strong> muito mais rápida (<strong>Passo a Passo Manual</strong>):<br><br>
             1. Abra <em>Configurações &rarr; Sobre o telefone</em> e toque 7 vezes em <strong>Número da versão</strong>.<br>
             2. Volte em <em>Configurações &rarr; Sistema &rarr; Opções do desenvolvedor</em>.<br>
             3. Mude as 3 opções de <strong>Escala de animação (janela, transição e animador)</strong> de <code>1x</code> para <code>0,5x</code>.<br>
             4. Em <em>Configurações &rarr; Tela</em>, deixe a taxa de atualização em <strong>Automática / 120Hz</strong>.`,
-            { showSupportFooter: false }
+            { uacTask: 'animations', hideManualGuideBtn: true }
           );
           return;
         }
@@ -3936,16 +4352,18 @@
 
             appendBotMessage(
               `${statusStr}<br><br>
-              🔍 <strong>Onde liberar mais espaço sem perder suas fotos pessoais:</strong><br>
+              🔍 <strong>Passo a Passo Manual para liberar espaço sem perder fotos pessoais:</strong><br>
               1. <strong>Mídias repetidas do WhatsApp:</strong> Vá em <em>WhatsApp &rarr; Configurações &rarr; Armazenamento e dados &rarr; Gerenciar armazenamento</em> e apague vídeos grandes de grupos.<br>
-              2. <strong>Caches ocultos (Redes Sociais/APKs):</strong> Toque em <strong>🧹 Limp. Profunda</strong> no topo desta tela para remover até 1.8 GB de arquivos temporários.<br>
-              3. <strong>Lixeira de Fotos:</strong> Esvazie a aba <em>Biblioteca &rarr; Lixeira</em> do Google Fotos/Galeria.`
+              2. <strong>Caches ocultos (Redes Sociais/APKs):</strong> Toque em <strong>🧹 Limp. Profunda</strong> no topo desta tela ou autorize a IA abaixo para remover até 1.8 GB de arquivos temporários.<br>
+              3. <strong>Lixeira de Fotos:</strong> Esvazie a aba <em>Biblioteca &rarr; Lixeira</em> do Google Fotos/Galeria.`,
+              { uacTask: 'storage' }
             );
           } else {
             appendBotMessage(
-              `Se o armazenamento continua cheio na categoria <strong>"Sistema / Outros"</strong>:<br><br>
+              `Se o armazenamento continua cheio na categoria <strong>"Sistema / Outros"</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
               • Aplicativos como <strong>Telegram, TikTok e Spotify</strong> guardam gigabytes de vídeos e músicas offline. Entre nas configurações internas desses apps e toque em <em>Limpar Cache de Mídia</em>.<br>
-              • Na pasta <strong>Downloads</strong> do aplicativo <em>Files (Arquivos)</em>, ordene do maior para o menor e apague instaladores antigos e PDFs pesados.`
+              • Na pasta <strong>Downloads</strong> do aplicativo <em>Files (Arquivos)</em>, ordene do maior para o menor e apague instaladores antigos e PDFs pesados.`,
+              { uacTask: 'storage' }
             );
           }
           return;
@@ -3955,10 +4373,11 @@
         if (norm.match(/\b(som|audio|alto-falante|alto falante|microfone|mudo|volume baixo|chiando)\b/)) {
           botContext.lastTopic = 'audio';
           appendBotMessage(
-            `Se o <strong>som ou microfone</strong> está baixo, abafado ou falhando:<br><br>
+            `Se o <strong>som ou microfone</strong> está baixo, abafado ou falhando (<strong>Passo a Passo Manual</strong>):<br><br>
             1. <strong>Limpeza acústica:</strong> Passe uma escova seca na saída inferior do alto-falante e use <strong>🩺 Testar Sensores &rarr; Testar Som</strong> no topo (o pulso de 880Hz ajuda a expelir poeira fina).<br>
             2. <strong>Bluetooth preso:</strong> Desligue o Bluetooth para garantir que o áudio não está sendo enviado para um fone ou caixa pareada.<br>
-            3. Se falhar apenas em chamadas de voz, verifique a permissão de <em>Microfone</em> do aplicativo em <em>Configurações &rarr; Aplicativos</em>.`
+            3. Se falhar apenas em chamadas de voz, verifique a permissão de <em>Microfone</em> do aplicativo em <em>Configurações &rarr; Aplicativos</em>.`,
+            { uacTask: 'audio' }
           );
           return;
         }
@@ -3966,10 +4385,11 @@
         if (norm.match(/\b(touch|toque fantasma|mexendo sozinho|clicando sozinho|tela travada|tela nao responde|display)\b/)) {
           botContext.lastTopic = 'touch';
           appendBotMessage(
-            `Para corrigir <strong>toque fantasma (tela mexendo sozinha) ou falha no touch</strong>:<br><br>
+            `Para corrigir <strong>toque fantasma (tela mexendo sozinha) ou falha no touch</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
             1. <strong>Teste fora da tomada:</strong> Carregadores não originais geram oscilação elétrica na tela e causam cliques sozinhos.<br>
             2. <strong>Sensibilidade e Película:</strong> Limpe a tela a seco e ative <em>Aumentar sensibilidade do toque</em> em <em>Configurações &rarr; Tela</em>.<br>
-            3. Faça o diagnóstico da matriz clicando em <strong>🩺 Testar Sensores &rarr; Testar Touch</strong> na barra superior.`
+            3. Faça o diagnóstico da matriz clicando em <strong>🩺 Testar Sensores &rarr; Testar Touch</strong> na barra superior.`,
+            { uacTask: 'touch' }
           );
           return;
         }
@@ -3977,9 +4397,10 @@
         if (norm.match(/\b(camera|tirar foto|foco|lente|camera preta)\b/)) {
           botContext.lastTopic = 'camera';
           appendBotMessage(
-            `Para resolver falhas na <strong>Câmera</strong>:<br><br>
+            `Para resolver falhas na <strong>Câmera</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
             1. Segure o ícone da <strong>Câmera</strong> &rarr; <em>Informações do app &rarr; Armazenamento &rarr; Limpar Cache</em>.<br>
-            2. Feche apps que usam vídeo (WhatsApp, Instagram, Meet) e reinicie o aparelho caso apareça <em>"Erro na câmera"</em>.`
+            2. Feche apps que usam vídeo (WhatsApp, Instagram, Meet) e reinicie o aparelho caso apareça <em>"Erro na câmera"</em>.`,
+            { uacTask: 'camera' }
           );
           return;
         }
@@ -3988,9 +4409,10 @@
           botContext.lastTopic = 'sensors';
           botContext.pendingQuestion = 'ask_sensor_type';
           appendBotMessage(
-            `Você pode testar Alto-falante, Touchscreen, Rede e Bateria clicando em <strong>🩺 Testar Sensores</strong> no topo.<br><br>
+            `Você pode testar Alto-falante, Touchscreen, Rede e Bateria clicando em <strong>🩺 Testar Sensores</strong> no topo, ou deixar a IA calibrar os sensores para você.<br><br>
             Qual componente específico está apresentando falha aí: <strong>som/áudio</strong>, <strong>toque na tela</strong> ou <strong>câmera</strong>?`,
             {
+              uacTask: 'touch',
               quickReplies: [
                 { label: "🔊 Som / Áudio", prompt: "Problema no som" },
                 { label: "📱 Toque na tela", prompt: "Problema no toque da tela" },
@@ -4005,10 +4427,11 @@
         if (norm.match(/\b(nao carrega|carregando lento|demora para carregar|mau contato|conector|cabo|carregador|umidade)\b/)) {
           botContext.lastTopic = 'charging';
           appendBotMessage(
-            `Se o aparelho <strong>demora para carregar, tem mau contato ou não reconhece o carregador</strong>:<br><br>
+            `Se o aparelho <strong>demora para carregar, tem mau contato ou não reconhece o carregador</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
             1. <strong>Poeira compactada no conector USB-C:</strong> 80% dos casos de mau contato são fiapos de bolso no fundo da entrada do celular. Com o aparelho desligado, limpe delicadamente com um palito de madeira/plástico (nunca metal).<br>
             2. <strong>Carregamento Rápido:</strong> Verifique em <em>Configurações &rarr; Bateria &rarr; Configurações de carregamento</em> se a opção <strong>Carregamento rápido (Turbo/Fast Charge)</strong> está ativada.<br>
-            3. Confira a tensão atual em <strong>🩺 Testar Sensores &rarr; Testar Carga</strong> no topo.`
+            3. Confira a tensão atual em <strong>🩺 Testar Sensores &rarr; Testar Carga</strong> no topo.`,
+            { uacTask: 'charging' }
           );
           return;
         }
@@ -4026,16 +4449,18 @@
 
             appendBotMessage(
               `${tempContext}<br><br>
-              ✅ <strong>3 ações que reduzem o aquecimento e economizam até 30% de bateria:</strong><br>
+              ✅ <strong>Passo a Passo Manual (3 ações que reduzem o aquecimento e economizam até 30% de bateria):</strong><br>
               1. Desative o rastreamento oculto em <em>Configurações &rarr; Localização &rarr; Serviços de localização</em> desligando <strong>Busca por Wi-Fi</strong> e <strong>Busca por Bluetooth</strong>.<br>
               2. Em <em>Configurações &rarr; Bateria &rarr; Uso da bateria</em>, toque nos apps que mais consomem no topo da lista e marque <strong>Restrito em 2º plano</strong>.<br>
-              3. Use <strong>⚡ Task Kill RAM</strong> lá em cima para encerrar processos travados que esquentam o processador.`
+              3. Use <strong>⚡ Task Kill RAM</strong> lá em cima ou deixe a IA aplicar todo o resfriamento por você abaixo:`,
+              { uacTask: 'battery_heat' }
             );
           } else {
             appendBotMessage(
-              `Complementando sobre a <strong>vida útil da bateria</strong>:<br><br>
+              `Complementando sobre a <strong>vida útil da bateria</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
               • Quando o sinal de operadora (4G/5G) está muito fraco (1 barra), a antena interna dobra a potência elétrica procurando torre, aquecendo a traseira. Em locais sem sinal, ative o Wi-Fi Calling ou o Modo Avião com Wi-Fi.<br>
-              • Evite deixar a carga cair abaixo de 15% com frequência para preservar os ciclos de lítio.`
+              • Evite deixar a carga cair abaixo de 15% com frequência para preservar os ciclos de lítio.`,
+              { uacTask: 'battery_heat' }
             );
           }
           return;
@@ -4045,9 +4470,10 @@
         if (norm.match(/\b(bluetooth|parear|fone bluetooth|caixa de som)\b/)) {
           botContext.lastTopic = 'bluetooth';
           appendBotMessage(
-            `Para corrigir falha de <strong>conexão ou corte no Bluetooth</strong>:<br><br>
+            `Para corrigir falha de <strong>conexão ou corte no Bluetooth</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
             1. Esqueça o dispositivo em <em>Configurações &rarr; Dispositivos conectados</em> e pareie novamente.<br>
-            2. Vá em <em>Configurações &rarr; Gerenciamento Geral &rarr; Restaurar &rarr; Redefinir configurações de Wi-Fi e Bluetooth</em> para limpar o cache do controlador sem apagar seus dados.`
+            2. Vá em <em>Configurações &rarr; Gerenciamento Geral &rarr; Restaurar &rarr; Redefinir configurações de Wi-Fi e Bluetooth</em> para limpar o cache do controlador sem apagar seus dados.`,
+            { uacTask: 'bluetooth' }
           );
           return;
         }
@@ -4060,16 +4486,19 @@
           if (stage === 1) {
             botContext.pendingQuestion = 'offer_dns_flush';
             appendBotMessage(
-              `Quando o Wi-Fi ou 4G/5G fica caindo, lento ou exibe <em>"Conectado sem internet"</em>, geralmente há falha na tabela DNS:<br><br>
-              1. <strong>Reparo Automático:</strong> <button type="button" onclick="openBotUacModal('dns')" class="underline font-bold text-blue-700">Clique aqui para executar o Flush DNS</button> e renovar o endereço IP.<br>
-              2. <strong>DNS Privado mais rápido:</strong> Em <em>Configurações &rarr; Rede e Internet &rarr; DNS Privado</em>, configure <code>dns.google</code> ou <code>one.one.one.one</code>.<br>
-              3. Se estiver no Wi-Fi de casa, prefira a rede <strong>5GHz</strong> (sofre menos interferência que a 2.4GHz).`
+              `Quando o Wi-Fi ou 4G/5G fica caindo, lento ou exibe <em>"Conectado sem internet"</em>, geralmente há falha na tabela DNS.<br><br>
+              ✅ <strong>Passo a Passo Manual:</strong><br>
+              1. <strong>DNS Privado mais rápido:</strong> Em <em>Configurações &rarr; Rede e Internet &rarr; DNS Privado</em>, configure <code>dns.google</code> ou <code>one.one.one.one</code>.<br>
+              2. <strong>Renovar Conexão:</strong> Ative o <em>Modo Avião</em> por 15 segundos e desligue.<br>
+              3. Se estiver no Wi-Fi de casa, prefira a rede <strong>5GHz</strong> (sofre menos interferência que a 2.4GHz).`,
+              { uacTask: 'dns' }
             );
           } else {
             appendBotMessage(
-              `Se a falha persistir especificamente nos <strong>Dados Móveis (4G/5G)</strong>:<br><br>
+              `Se a falha persistir especificamente nos <strong>Dados Móveis (4G/5G)</strong> (<strong>Passo a Passo Manual</strong>):<br><br>
               • Vá em <em>Configurações &rarr; Rede Móvel &rarr; Pontos de Acesso (APN)</em>, toque nos 3 pontinhos e selecione <strong>Redefinir para o padrão</strong>.<br>
-              • Ligue o Modo Avião por 15 segundos para forçar o chip a se reconectar na antena mais próxima.`
+              • Ligue o Modo Avião por 15 segundos para forçar o chip a se reconectar na antena mais próxima.`,
+              { uacTask: 'dns' }
             );
           }
           return;
@@ -4083,15 +4512,18 @@
 
           if (stage === 1) {
             appendBotMessage(
-              `Propagandas abrindo sozinhas na tela são causadas por <strong>Adware</strong> (algum app com permissão de sobreposição) ou notificações de sites no navegador:<br><br>
-              1. <strong>Bloquear Sobreposição Suspeita:</strong> <button type="button" onclick="openBotUacModal('adware')" class="underline font-bold text-blue-700">Clique aqui para rodar o bloqueio de Adware</button>.<br>
+              `Propagandas abrindo sozinhas na tela são causadas por <strong>Adware</strong> (algum app com permissão de sobreposição) ou notificações de sites no navegador.<br><br>
+              ✅ <strong>Passo a Passo Manual:</strong><br>
+              1. <strong>Sobreposição de Tela:</strong> Vá em <em>Configurações &rarr; Aplicativos &rarr; Acesso Especial &rarr; Sobrepor a outros apps</em> e desative apps desconhecidos.<br>
               2. <strong>Se vem como notificação do Chrome:</strong> Abra o <em>Chrome &rarr; Configurações &rarr; Configurações do site &rarr; Notificações</em> e remova sites desconhecidos.<br>
-              3. <strong>Se abre em tela cheia:</strong> Vá em <em>Configurações &rarr; Aplicativos &rarr; Ver todos</em> e desinstale apps de limpeza falsa, horóscopo, PDF ou lanterna instalados recentemente (às vezes ficam com ícone em branco).`
+              3. <strong>Se abre em tela cheia:</strong> Vá em <em>Configurações &rarr; Aplicativos &rarr; Ver todos</em> e desinstale apps de limpeza falsa, horóscopo, PDF ou lanterna instalados recentemente (às vezes ficam com ícone em branco).`,
+              { uacTask: 'adware' }
             );
           } else {
             appendBotMessage(
-              `💡 <strong>Dica para descobrir exatamente qual app está jogando o anúncio:</strong><br><br>
-              Assim que a propaganda pular na tela, <strong>não feche</strong>: toque no botão de <strong>Apps Recentes (quadrado)</strong> na barra inferior do Android. O nome e o ícone verdadeiro do app culpado aparecerão no topo do cartão! Aí basta segurar o dedo sobre esse ícone, ir em <em>Informações do app</em> e clicar em <strong>Desinstalar</strong>.`
+              `💡 <strong>Passo a Passo Manual para descobrir exatamente qual app está jogando o anúncio:</strong><br><br>
+              Assim que a propaganda pular na tela, <strong>não feche</strong>: toque no botão de <strong>Apps Recentes (quadrado)</strong> na barra inferior do Android. O nome e o ícone verdadeiro do app culpado aparecerão no topo do cartão! Aí basta segurar o dedo sobre esse ícone, ir em <em>Informações do app</em> e clicar em <strong>Desinstalar</strong>.`,
+              { uacTask: 'adware' }
             );
           }
           return;
@@ -4112,9 +4544,11 @@
 
             appendBotMessage(
               `${ramNote}<br><br>
+              ✅ <strong>Passo a Passo Manual:</strong><br>
               1. Segure o ícone do <strong>${mentionedApp.name}</strong> &rarr; <em>Informações do app &rarr; Armazenamento e cache &rarr; Limpar Cache</em>.<br>
               2. Na Play Store, atualize o <strong>${mentionedApp.name}</strong> e o componente <strong>Android System WebView</strong>.<br>
-              ${!isRamOk ? `3. Use o botão <strong>⚡ Task Kill RAM</strong> no topo para liberar memória antes de abri-lo.` : `3. Se for app de banco, confira se a <em>Data e hora automáticas</em> estão ativas nas configurações.`}`
+              ${!isRamOk ? `3. Use o botão <strong>⚡ Task Kill RAM</strong> no topo para liberar memória antes de abri-lo.` : `3. Se for app de banco, confira se a <em>Data e hora automáticas</em> estão ativas nas configurações.`}`,
+              { uacTask: 'app_crash' }
             );
             return;
           }
@@ -4126,11 +4560,12 @@
               ? `Como a memória RAM já está normalizada (<strong>${m.ram}%</strong>), o fechamento de aplicativos não é falta de memória, e sim <strong>cache corrompido</strong> ou desatualização do <strong>Android System WebView</strong>.`
               : `No momento a RAM está elevada (<strong>${m.ram}%</strong>), o que faz o Android encerrar apps pesados automaticamente.`
             }<br><br>
-            ✅ <strong>Como corrigir:</strong><br>
+            ✅ <strong>Passo a Passo Manual:</strong><br>
             1. Segure o ícone do app que está fechando &rarr; <strong>Informações (i)</strong> &rarr; <em>Armazenamento e cache</em> &rarr; <strong>Limpar Cache</strong>.<br>
             2. Na Play Store, atualize o <strong>Android System WebView</strong>.<br><br>
             Qual aplicativo específico está fechando aí (ex: WhatsApp, Instagram, Jogo ou App de Banco)?`,
             {
+              uacTask: 'app_crash',
               quickReplies: [
                 { label: "📱 Instagram / WhatsApp", prompt: "WhatsApp / Instagram" },
                 { label: "🎮 Jogo (Free Fire / Roblox)", prompt: "Jogo fechando" },
@@ -4150,17 +4585,34 @@
 
           // Se já perguntou 2+ vezes sobre lentidão, avança para etapa 2 ou 3 sem repetir o texto anterior!
           if (stage === 2) {
-            botContext.pendingQuestion = 'offer_animations';
-            appendBotMessage(
-              `Além da memória e do RAM Plus, outras <strong>2 configurações escondidas</strong> costumam prender o desempenho do ${userDevice}:<br><br>
-              1. <strong>Economia de Bateria ligada:</strong> Ela limita o processador a ~60% da velocidade e reduz a tela para 60Hz. Desative quando precisar de fluidez.<br>
-              2. <strong>Apps com Permissão de Acessibilidade:</strong> Antivírus extras ou limpadores de terceiros monitoram cada toque na tela e causam atraso. Desative-os em <em>Configurações &rarr; Acessibilidade</em>.<br><br>
-              Quer que eu te mostre como reduzir a escala de animação para <code>0,5x</code> para abrir os apps na metade do tempo?`,
-              {
-                quickReplies: [
-                  { label: "🚀 Sim, mostrar passo a passo 0,5x", prompt: "Sim, quero ver" },
+            botContext.lastTopic = 'hidden_perf';
+            const alreadySawAnimations = botContext.usedResponseKeys.has('animations_shown');
+            if (!alreadySawAnimations) {
+              botContext.pendingQuestion = 'offer_animations';
+            }
+            const followUpQuestion = alreadySawAnimations
+              ? `Posso entrar nas configurações agora mesmo e <strong>desativar a Economia de Bateria + limpar os acessos de Acessibilidade automaticamente por você</strong> (basta clicar no botão da IA abaixo), ou você pode seguir o passo a passo manual acima!`
+              : `Quer que a IA faça esses ajustes por você agora ou quer ver também como reduzir a escala de animação para <code>0,5x</code> para abrir os apps na metade do tempo?`;
+
+            const stage2Replies = alreadySawAnimations
+              ? [
+                  { label: "🤖 IA: Fazer Isso Por Mim", prompt: "Faz pra mim" },
                   { label: "👨‍💻 Chamar Suporte Humano", prompt: "Solicitar suporte humano" }
                 ]
+              : [
+                  { label: "🚀 Sim, mostrar passo a passo 0,5x", prompt: "Sim, quero ver" },
+                  { label: "🤖 IA: Fazer Isso Por Mim", prompt: "Faz pra mim" },
+                  { label: "👨‍💻 Chamar Suporte Humano", prompt: "Solicitar suporte humano" }
+                ];
+
+            appendBotMessage(
+              `Além da memória e do RAM Plus, outras <strong>2 configurações escondidas</strong> costumam prender o desempenho do ${userDevice} (<strong>Passo a Passo Manual</strong>):<br><br>
+              1. <strong>Economia de Bateria ligada:</strong> Ela limita o processador a ~60% da velocidade e reduz a tela para 60Hz. Desative em <em>Configurações &rarr; Bateria</em> quando precisar de fluidez.<br>
+              2. <strong>Apps com Permissão de Acessibilidade:</strong> Antivírus extras ou limpadores de terceiros monitoram cada toque na tela e causam atraso. Desative-os em <em>Configurações &rarr; Acessibilidade</em>.<br><br>
+              ${followUpQuestion}`,
+              {
+                uacTask: 'hidden_perf',
+                quickReplies: stage2Replies
               }
             );
             return;
@@ -4169,10 +4621,12 @@
           if (stage >= 3) {
             botContext.pendingQuestion = 'offer_human_support';
             appendBotMessage(
-              `Como você já limpou a memória e ajustou o sistema mas o aparelho ainda apresenta travamentos, vale testar se algum aplicativo está causando conflito entrando no <strong>Modo Seguro</strong> (segure o botão desligar &rarr; pressione sobre <em>Desligar</em> na tela).<br><br>
-              Quer que eu gere um protocolo agora para um <strong>Técnico Humano</strong> analisar a telemetria do seu aparelho em tempo real?`,
+              `Como você já limpou a memória e ajustou o sistema mas o aparelho ainda apresenta travamentos, vale testar se algum aplicativo está causando conflito entrando no <strong>Modo Seguro</strong> (<strong>Passo a Passo Manual:</strong> segure o botão desligar &rarr; pressione sobre <em>Desligar</em> na tela).<br><br>
+              Você pode deixar a <strong>IA isolar os apps em conflito automaticamente</strong> abaixo ou gerar um protocolo agora para um <strong>Técnico Humano</strong> analisar a telemetria do seu aparelho em tempo real:`,
               {
+                uacTask: 'isolation_mode',
                 quickReplies: [
+                  { label: "🤖 IA: Isolar Apps Por Mim", prompt: "Faz pra mim" },
                   { label: "👨‍💻 Gerar Protocolo Agora", prompt: "Sim, gerar protocolo" }
                 ]
               }
@@ -4185,12 +4639,14 @@
             botContext.pendingQuestion = 'ask_slow_where';
             appendBotMessage(
               `Notei que a <strong>Memória RAM já está controlada (${m.ram}%)</strong> e o desempenho subiu para <strong>${m.performance}%</strong>. Quando o aparelho continua engasgando mesmo após limpar a RAM, a causa costuma ser a <strong>Memória Virtual (RAM Plus)</strong>:<br><br>
-              • ${brandInfo.specificTip}<br><br>
-              Você sente essa lentidão mais ao <strong>rolar a tela/redes sociais</strong> ou dentro de <strong>jogos</strong>?`,
+              • <strong>Passo a Passo Manual:</strong> ${brandInfo.specificTip}<br><br>
+              Você pode deixar a IA desativar o RAM Plus por você abaixo, ou me contar: sente essa lentidão mais ao <strong>rolar a tela/redes sociais</strong> ou dentro de <strong>jogos</strong>?`,
               {
+                uacTask: 'ram_plus',
                 quickReplies: [
                   { label: "📱 Tela inicial / Redes sociais", prompt: "Nas redes sociais e tela inicial" },
-                  { label: "🎮 Em jogos pesados", prompt: "Em jogos pesados" }
+                  { label: "🎮 Em jogos pesados", prompt: "Em jogos pesados" },
+                  { label: "🤖 IA: Desativar RAM Plus Por Mim", prompt: "Faz pra mim" }
                 ]
               }
             );
@@ -4198,12 +4654,14 @@
             botContext.pendingQuestion = 'offer_animations';
             appendBotMessage(
               `O seu <strong>${userDevice}</strong> está lento agora por 3 fatores combinados: <strong>RAM em ${m.ram}%</strong> (${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB), <strong>armazenamento em ${m.storage}%</strong> e temperatura em <strong>${m.temp.toFixed(1)}°C</strong> (acima de 40°C o Android reduz a potência do processador).<br><br>
-              ✅ <strong>Para destravar agora:</strong><br>
+              ✅ <strong>Passo a Passo Manual para destravar agora:</strong><br>
               1. Toque em <strong>🧹 Limp. Profunda</strong> ou <strong>⚡ Task Kill RAM</strong> na barra acima para liberar memória imediatamente.<br>
               2. ${brandInfo.specificTip}<br><br>
-              Quer ver também como deixar as animações do Android 2x mais rápidas nas configurações?`,
+              Quer que a IA faça essa limpeza e otimização por você agora ou quer ver também como deixar as animações do Android 2x mais rápidas?`,
               {
+                uacTask: 'ram',
                 quickReplies: [
+                  { label: "🤖 IA: Fazer Isso Por Mim", prompt: "Faz pra mim" },
                   { label: "🧹 Abrir Limpeza Profunda", prompt: "Abrir limpeza profunda" },
                   { label: "🚀 Ver dica das animações 2x", prompt: "Sim, quero ver" }
                 ]
@@ -4217,10 +4675,11 @@
         if (norm.match(/\b(reiniciando|reinicia sozinho|desligando sozinho|desliga sozinho|loop|tela azul|travou na logo)\b/)) {
           botContext.lastTopic = 'reboot';
           appendBotMessage(
-            `Quando o celular <strong>reinicia ou desliga sozinho</strong>, existem 3 causas principais:<br><br>
+            `Quando o celular <strong>reinicia ou desliga sozinho</strong>, existem 3 causas principais (<strong>Passo a Passo Manual</strong>):<br><br>
             1. <strong>Botão Power preso ou capinha apertada:</strong> Retire a capinha e clique várias vezes no botão de ligar para garantir que ele não está travado internamente.<br>
             2. <strong>Queda de tensão da bateria:</strong> Se ele desliga mesmo marcando 20% ou 30% de bateria, a célula precisa de recalibração ou substituição.<br>
-            3. <strong>Conflito de sistema:</strong> Desative a opção <em>Reinício automático programado</em> dentro de <em>Configurações &rarr; Assistência do Aparelho</em>.`
+            3. <strong>Conflito de sistema:</strong> Desative a opção <em>Reinício automático programado</em> dentro de <em>Configurações &rarr; Assistência do Aparelho</em>.`,
+            { uacTask: 'reboot' }
           );
           return;
         }
@@ -4229,12 +4688,14 @@
         botContext.lastTopic = 'general';
         botContext.pendingQuestion = 'offer_human_support';
         appendBotMessage(
-          `Entendi! Para analisarmos <strong>"${raw}"</strong> da forma mais certeira:<br><br>
-          • Se isso começou após instalar ou atualizar algum aplicativo, tente ir em <em>Configurações &rarr; Aplicativos</em>, selecionar o app e tocar em <strong>Forçar parada &rarr; Limpar Cache</strong>.<br>
+          `Entendi! Para resolvermos <strong>"${raw}"</strong> da forma mais certeira (<strong>Passo a Passo Manual</strong>):<br><br>
+          • Se isso começou após instalar ou atualizar algum aplicativo, vá em <em>Configurações &rarr; Aplicativos</em>, selecione o app e toque em <strong>Forçar parada &rarr; Limpar Cache</strong>.<br>
           • Se suspeitar de falha física no aparelho, você pode rodar o <strong>🩺 Teste de Sensores</strong> na barra superior.<br><br>
-          Prefere me contar se aparece alguma mensagem de erro na tela ou quer que eu gere um <strong>Protocolo para o Suporte Técnico Humano</strong> te atender ao vivo?`,
+          Você pode autorizar a <strong>IA a executar a otimização e limpeza automática por você</strong> abaixo, ou gerar um <strong>Protocolo para o Suporte Técnico Humano</strong> te atender ao vivo:`,
           {
+            uacTask: 'ram',
             quickReplies: [
+              { label: "🤖 IA: Corrigir Por Mim", prompt: "Faz pra mim" },
               { label: "🩺 Testar Sensores", prompt: "Testar sensores" },
               { label: "👨‍💻 Falar com Técnico Humano", prompt: "Solicitar suporte humano" }
             ]
@@ -4554,6 +5015,225 @@
       quickGenerateAndPasteProtocol();
     }
 
+    let currentTechRemoteMode = 'pc_to_phone';
+
+    function formatRemoteIdFromProtocol(protocolCode = 'HT-1000') {
+      const digits = (protocolCode.replace(/\D/g, '') || '4829').padEnd(4, '7');
+      return `842 ${digits.slice(0, 3)} ${digits.slice(1, 4)}`;
+    }
+
+    function toggleTechAnyDeskPanel(forceState = null) {
+      if (!activeTechTicketProtocol) {
+        showToastNotice("Selecione um protocolo na fila primeiro!");
+        return;
+      }
+      const panel = document.getElementById('tech-anydesk-panel');
+      if (!panel) return;
+      const shouldShow = forceState !== null ? forceState : panel.classList.contains('hidden');
+      if (shouldShow) {
+        panel.classList.remove('hidden');
+        const idEl = document.getElementById('tech-anydesk-id-label');
+        if (idEl) idEl.innerText = formatRemoteIdFromProtocol(activeTechTicketProtocol);
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+
+    function selectTechRemoteMode(mode) {
+      currentTechRemoteMode = mode === 'phone_to_phone' ? 'phone_to_phone' : 'pc_to_phone';
+      const btnPc = document.getElementById('btn-mode-pc-phone');
+      const btnPhone = document.getElementById('btn-mode-phone-phone');
+      if (btnPc && btnPhone) {
+        if (currentTechRemoteMode === 'pc_to_phone') {
+          btnPc.className = "py-1 px-2 rounded bg-red-600 text-white font-bold border border-red-400 text-[10px] flex items-center justify-center gap-1";
+          btnPhone.className = "py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-600 text-[10px] flex items-center justify-center gap-1";
+        } else {
+          btnPhone.className = "py-1 px-2 rounded bg-red-600 text-white font-bold border border-red-400 text-[10px] flex items-center justify-center gap-1";
+          btnPc.className = "py-1 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-600 text-[10px] flex items-center justify-center gap-1";
+        }
+      }
+    }
+
+    function setTechSupportProgramPreset(progName) {
+      const inp = document.getElementById('tech-remote-program-input');
+      if (inp) inp.value = progName;
+    }
+
+    function renderClientAnyDeskDock(ticket) {
+      const dock = document.getElementById('client-anydesk-dock');
+      if (!dock) return;
+      const rs = ticket && ticket.remoteSession ? ticket.remoteSession : null;
+      if (!rs || !rs.active) {
+        dock.classList.add('hidden');
+        dock.innerHTML = '';
+        return;
+      }
+
+      dock.classList.remove('hidden');
+      const modeLabel = rs.mode === 'phone_to_phone' ? '📱 Celular &rarr; 📱 Celular' : '💻 PC &rarr; 📱 Celular';
+      const remoteId = rs.remoteId || formatRemoteIdFromProtocol(ticket.protocol);
+      const progName = rs.programName || 'HelpTop CleanDesk Pro v4.2';
+      const techName = rs.techName || ticket.assignedTech || 'Suporte Técnico';
+
+      if (rs.status === 'requested') {
+        dock.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="px-1.5 py-0.5 bg-red-600 text-white rounded font-extrabold text-[9px] animate-pulse">AnyDesk</span>
+              <strong class="text-[11px] text-white">Pedido de Conexão Remota</strong>
+            </div>
+            <span class="px-1.5 py-0.5 bg-slate-800 border border-slate-600 text-emerald-300 rounded font-mono text-[9px]">ID: ${remoteId}</span>
+          </div>
+          <div class="text-slate-200 leading-snug space-y-1">
+            <div>O técnico <strong class="text-amber-300">${techName}</strong> solicita acesso remoto (<strong>${modeLabel}</strong>) para executar o programa de suporte:</div>
+            <div class="p-1.5 bg-slate-950 border border-slate-700 rounded font-mono text-emerald-300 text-[9px]">
+              📦 ${progName}
+            </div>
+            <div class="text-[9px] text-slate-400">💬 O seu chat abaixo continua 100% ativo durante toda a sessão!</div>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+            <button type="button" onclick="clientRespondAnyDeskSession('${ticket.protocol}', true)" class="py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded text-[10px] shadow">
+              ✓ Permitir & Rodar Programa
+            </button>
+            <button type="button" onclick="clientRespondAnyDeskSession('${ticket.protocol}', false)" class="py-1.5 px-2 bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold rounded text-[10px]">
+              ✕ Recusar Acesso
+            </button>
+          </div>
+        `;
+      } else {
+        const logs = Array.isArray(rs.logs) && rs.logs.length > 0
+          ? rs.logs
+          : [
+              `✓ Túnel AnyDesk ativo (${modeLabel} • ID ${remoteId})`,
+              `📦 Programa do Suporte carregado: ${progName}`,
+              `⚡ Limpeza Remota concluída: RAM 45% • Temp 36.2°C • Desempenho 96%`
+            ];
+        dock.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span class="px-1.5 py-0.5 bg-red-600 text-white rounded font-extrabold text-[9px]">AnyDesk Ativo</span>
+              <strong class="text-[10px] text-emerald-300 truncate">${modeLabel}</strong>
+            </div>
+            <button type="button" onclick="closeAnyDeskRemoteSession('${ticket.protocol}')" class="px-1.5 py-0.5 bg-red-800 hover:bg-red-700 text-white rounded text-[9px] font-bold">
+              Desconectar
+            </button>
+          </div>
+          <div class="text-[9px] text-slate-300 flex items-center justify-between">
+            <span>Técnico: <strong class="text-white">${techName}</strong></span>
+            <span class="font-mono text-amber-300">ID: ${remoteId}</span>
+          </div>
+          <div class="p-1.5 bg-slate-950 border border-slate-700 rounded font-mono text-[9px] text-emerald-300 space-y-0.5">
+            ${logs.map(l => `<div>${l}</div>`).join('')}
+          </div>
+          <div class="text-[9px] text-slate-400 flex items-center justify-between">
+            <span>💬 Chat ao vivo liberado abaixo enquanto o suporte atua.</span>
+            <span class="text-emerald-400 font-bold">● Programa Ativo</span>
+          </div>
+        `;
+      }
+    }
+
+    function clientRespondAnyDeskSession(protocolCode, accepted) {
+      supportTickets = loadSupportTickets();
+      const ticket = supportTickets.find(t => t.protocol === protocolCode);
+      if (!ticket || !ticket.remoteSession) return;
+
+      const rs = ticket.remoteSession;
+      const modeText = rs.mode === 'phone_to_phone' ? 'Celular para Celular' : 'PC para Celular';
+      const progName = rs.programName || 'HelpTop CleanDesk Pro v4.2';
+
+      if (!accepted) {
+        ticket.remoteSession.active = false;
+        ticket.remoteSession.status = 'declined';
+        ticket.messages.push({
+          senderRole: 'system',
+          senderName: ticket.clientName,
+          text: `⚠️ O cliente recusou a sessão remota AnyDesk. O atendimento segue pelo chat e passo a passo manual.`
+        });
+        saveSupportTickets(false);
+        broadcastFullState({
+          action: 'TECH_REMOTE',
+          protocol: ticket.protocol,
+          previewText: `Cliente recusou o acesso AnyDesk no protocolo ${ticket.protocol}.`
+        });
+        renderClientSupportMessages(protocolCode);
+        return;
+      }
+
+      // Cliente aceitou: ativa a sessão AnyDesk, roda o Programa do Suporte e aplica a Limpeza Remota mantendo o chat aberto!
+      ticket.remoteSession.active = true;
+      ticket.remoteSession.status = 'connected';
+      ticket.remoteSession.logs = [
+        `✓ Conexão AnyDesk (${modeText}) autorizada pelo cliente`,
+        `📦 Executando programa do suporte: ${progName}`,
+        `⚡ Limpando cache e processos travados -> RAM: 45% | Temp: 36.2°C | Desempenho: 96%`
+      ];
+      ticket.metrics = {
+        ram: 45,
+        ramUsed: 2.7,
+        ramTotal: 6.0,
+        storage: 76,
+        storageUsed: 97,
+        storageTotal: 128,
+        temp: 36.2,
+        performance: 96,
+        isCritical: false
+      };
+      demoState.metrics = { ...demoState.metrics, ...ticket.metrics };
+      syncUiMetrics();
+
+      const msgText = `🖥️ <strong>Sessão AnyDesk (${modeText}) Conectada!</strong> Programa do suporte <code>${progName}</code> executado com sucesso: RAM reduzida para <strong>45%</strong>, Temperatura em <strong>36.2°C</strong> e Desempenho em <strong>96%</strong> (chat continua ativo!).`;
+      ticket.messages.push({
+        senderRole: 'system',
+        senderName: rs.techName || 'Suporte Técnico',
+        text: msgText
+      });
+
+      addAuditLogEntry(
+        'PÓS-ANÁLISE',
+        `Sessão AnyDesk (${modeText}) + Programa "${progName}" autorizados no protocolo ${ticket.protocol} (RAM: 45%, Desempenho: 96%).`
+      );
+
+      saveSupportTickets(false);
+      broadcastFullState({
+        action: 'TECH_REMOTE',
+        protocol: ticket.protocol,
+        previewText: msgText
+      });
+      renderClientSupportMessages(protocolCode);
+      showToastNotice("Sessão AnyDesk conectada e programa do suporte executado!");
+    }
+
+    function closeAnyDeskRemoteSession(protocolCode) {
+      const targetProto = protocolCode || activeTechTicketProtocol || generatedProtocolCode;
+      if (!targetProto) return;
+      supportTickets = loadSupportTickets();
+      const ticket = supportTickets.find(t => t.protocol === targetProto);
+      if (!ticket || !ticket.remoteSession) return;
+
+      ticket.remoteSession.active = false;
+      ticket.remoteSession.status = 'closed';
+      ticket.messages.push({
+        senderRole: 'system',
+        senderName: 'HelpTop AnyDesk',
+        text: `🔌 Sessão remota AnyDesk encerrada. O chat de suporte continua aberto normalmente.`
+      });
+      saveSupportTickets(false);
+      broadcastFullState({
+        action: 'TECH_REMOTE',
+        protocol: ticket.protocol,
+        previewText: `Sessão AnyDesk encerrada no protocolo ${ticket.protocol}.`
+      });
+      if (demoState.currentScreen === 'support') {
+        renderClientSupportMessages(ticket.protocol);
+      }
+      if (demoState.currentScreen === 'tech-panel') {
+        renderTechActiveTicketDetails();
+      }
+      showToastNotice("Sessão remota AnyDesk desconectada (chat segue ativo).");
+    }
+
     function renderClientSupportMessages(protocolCode) {
       supportTickets = loadSupportTickets();
       const ticket = supportTickets.find(t => t.protocol === protocolCode);
@@ -4569,7 +5249,7 @@
       if (techBar) techBar.classList.remove('hidden');
       if (genBtn) genBtn.classList.add('hidden');
       if (helperLabel) helperLabel.innerText = `Conectado ao protocolo ${ticket.protocol}:`;
-      if (input) input.placeholder = "Digite sua mensagem para o técnico...";
+      if (input) input.placeholder = "Digite sua mensagem para o técnico (chat ativo)...";
 
       if (ticket.assignedTech) {
         document.getElementById('support-header-status').innerHTML = `<strong>${ticket.protocol}:</strong> ${ticket.status}`;
@@ -4582,6 +5262,9 @@
           techLabel.innerHTML = `⏳ <strong>Aguardando técnico aceitar</strong> (abra a 2ª Tela como Suporte)`;
         }
       }
+
+      // Atualiza o Dock AnyDesk acima do chat (mantendo o chat 100% ativo abaixo)
+      renderClientAnyDeskDock(ticket);
 
       container.innerHTML = `
         <div class="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 flex items-center justify-between gap-2">
@@ -4751,6 +5434,38 @@
         ? "px-2 py-0.5 bg-emerald-100 border border-emerald-400 text-emerald-900 rounded text-[9px] font-bold shrink-0"
         : "px-2 py-0.5 bg-blue-100 border border-blue-300 text-blue-900 rounded text-[9px] font-bold shrink-0";
 
+      const idEl = document.getElementById('tech-anydesk-id-label');
+      if (idEl) idEl.innerText = formatRemoteIdFromProtocol(ticket.protocol);
+
+      const statusPill = document.getElementById('tech-anydesk-status-pill');
+      const liveBox = document.getElementById('tech-anydesk-live-box');
+      if (ticket.remoteSession && ticket.remoteSession.active) {
+        const rs = ticket.remoteSession;
+        const modeTxt = rs.mode === 'phone_to_phone' ? 'Celular → Celular' : 'PC → Celular';
+        if (statusPill) {
+          statusPill.innerText = rs.status === 'requested' ? '⏳ Aguardando Cliente' : `🟢 Conectado (${modeTxt})`;
+          statusPill.className = rs.status === 'requested'
+            ? "px-1.5 py-0.5 bg-amber-950 border border-amber-500 text-amber-300 rounded text-[9px] font-bold"
+            : "px-1.5 py-0.5 bg-emerald-950 border border-emerald-500 text-emerald-300 rounded text-[9px] font-bold";
+        }
+        if (liveBox) {
+          liveBox.classList.remove('hidden');
+          const logs = Array.isArray(rs.logs) && rs.logs.length > 0
+            ? rs.logs
+            : [`📡 Aguardando permissão AnyDesk no aparelho de ${ticket.clientName}...`];
+          liveBox.innerHTML = logs.map(l => `<div>${l}</div>`).join('');
+        }
+      } else {
+        if (statusPill) {
+          statusPill.innerText = "Pronto";
+          statusPill.className = "px-1.5 py-0.5 bg-slate-800 border border-slate-600 text-amber-300 rounded text-[9px] font-bold";
+        }
+        if (liveBox) {
+          liveBox.classList.add('hidden');
+          liveBox.innerHTML = '';
+        }
+      }
+
       const m = ticket.metrics || { ram: 88, storage: 94, temp: 41.8, performance: 52 };
       const ramEl = document.getElementById('tech-metric-ram');
       const stoEl = document.getElementById('tech-metric-storage');
@@ -4856,9 +5571,45 @@
       const techName = demoState.user ? demoState.user.name : "Suporte Técnico";
       ticket.assignedTech = techName;
 
+      const progInput = document.getElementById('tech-remote-program-input');
+      const programName = (progInput && progInput.value.trim())
+        ? progInput.value.trim()
+        : "HelpTop CleanDesk Pro v4.2 (Limpador + Kernel Boost)";
+      const modeText = currentTechRemoteMode === 'phone_to_phone' ? "Celular para Celular" : "PC para Celular";
+      const remoteId = formatRemoteIdFromProtocol(ticket.protocol);
+
       let msgText = "";
-      if (actionType === 'clean') {
+      if (actionType === 'anydesk_request') {
         ticket.status = "Em Atendimento";
+        ticket.remoteSession = {
+          active: true,
+          status: 'requested',
+          mode: currentTechRemoteMode,
+          remoteId: remoteId,
+          programName: programName,
+          techName: techName,
+          logs: [
+            `📡 Solicitação AnyDesk (${modeText} • ID ${remoteId}) enviada ao cliente...`,
+            `📦 Programa preparado: ${programName}`
+          ]
+        };
+        msgText = `🖥️ <strong>Solicitação de Acesso Remoto (Estilo AnyDesk — ${modeText}):</strong> O técnico ${techName} pediu permissão (ID: <code>${remoteId}</code>) para conectar e executar o programa de suporte <strong>"${programName}"</strong>. Autorize no painel acima do chat!`;
+        ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
+      } else if (actionType === 'clean') {
+        ticket.status = "Em Atendimento";
+        ticket.remoteSession = {
+          active: true,
+          status: 'connected',
+          mode: currentTechRemoteMode,
+          remoteId: remoteId,
+          programName: programName,
+          techName: techName,
+          logs: [
+            `🟢 Sessão AnyDesk Ativa (${modeText} • ID ${remoteId})`,
+            `📦 Programa do Suporte em execução: ${programName}`,
+            `⚡ Limpeza Remota concluída: RAM 45% • Temp 36.2°C • Desempenho 96%`
+          ]
+        };
         ticket.metrics = {
           ram: 45,
           ramUsed: 2.7,
@@ -4870,7 +5621,7 @@
           performance: 96,
           isCritical: false
         };
-        msgText = `⚡ Limpeza Remota executada pelo técnico ${techName}: RAM reduzida para 45%, Temperatura em 36.2°C e Desempenho elevado para 96%!`;
+        msgText = `🖥️ <strong>Limpeza Remota via AnyDesk (${modeText} • ID ${remoteId}):</strong> O técnico ${techName} executou o programa de suporte <code>${programName}</code>! RAM reduzida para <strong>45%</strong>, Temperatura em <strong>36.2°C</strong> e Desempenho em <strong>96%</strong> (o chat continua ativo!).`;
         ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
       } else if (actionType === 'safemode') {
         ticket.status = "Em Atendimento";
@@ -4878,6 +5629,9 @@
         ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
       } else if (actionType === 'resolve') {
         ticket.status = "Resolvido";
+        if (ticket.remoteSession) {
+          ticket.remoteSession.active = false;
+        }
         msgText = `✓ Chamado ${ticket.protocol} concluído e marcado como Resolvido por ${techName}. Avalie o atendimento abaixo!`;
         ticket.messages.push({ senderRole: 'system', senderName: techName, text: msgText });
       }
@@ -4890,7 +5644,7 @@
       });
       renderTechSupportQueue();
       renderTechActiveTicketDetails();
-      showToastNotice("Ação remota sincronizada com o cliente em tempo real!");
+      showToastNotice("Sessão/Programa AnyDesk sincronizado com o cliente (chat continua ativo)!");
     }
 
     // =========================================================================
@@ -4958,6 +5712,7 @@
       demoState.isAuthenticated = false;
       demoState.user = null;
       demoState.analysisVisibleOnDashboard = false;
+      demoState.reminderEnabled = false;
       demoState.auditLogs = [];
       demoState.metrics = {
         ram: 88,
@@ -4972,6 +5727,10 @@
         batteryDrain: "4.1V • Estável",
         isCritical: true
       };
+
+      const chkRem = document.getElementById('chk-auto-schedule');
+      if (chkRem) chkRem.checked = false;
+      syncReminderButtonBadge();
 
       broadcastFullState({ action: 'RESET_ALL' });
       syncUiMetrics();
