@@ -833,8 +833,36 @@
           </div>
         </div>
 
-        <!-- Barra de Diagnósticos Rápidos e Ferramentas Avançadas (Todas as funções do Chat Bot preservadas) -->
+        <!-- Barra de Diagnósticos Rápidos, Telemetria em Tempo Real e Ferramentas Avançadas -->
         <div class="p-2 bg-gray-100 border-b border-gray-300 space-y-1.5 shrink-0">
+          <!-- Monitor de Telemetria em Tempo Real do Chat Bot -->
+          <div id="chat-live-telemetry-bar" class="p-1.5 bg-slate-900 text-white rounded-lg border border-blue-500/40 space-y-1 text-[9px] shadow-sm">
+            <div class="flex items-center justify-between gap-1 border-b border-slate-700 pb-1">
+              <div class="flex items-center gap-1 min-w-0">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                <span class="font-bold text-emerald-300 shrink-0">TEMPO REAL:</span>
+                <span id="chat-live-device" class="font-semibold text-white truncate">Detectando Hardware...</span>
+              </div>
+              <button type="button" onclick="syncRealLocalHardwareMetrics()" class="px-1.5 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-[8px] shrink-0">
+                🔄 Sincronizar
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-1 text-[9px]">
+              <div class="bg-slate-800/90 px-1.5 py-0.5 rounded truncate">
+                <span class="text-slate-400">RAM:</span> <strong id="chat-live-ram" class="text-cyan-300">--% (--/-- GB)</strong>
+              </div>
+              <div class="bg-slate-800/90 px-1.5 py-0.5 rounded truncate">
+                <span class="text-slate-400">Disco:</span> <strong id="chat-live-storage" class="text-amber-300">--% (--/-- GB)</strong>
+              </div>
+              <div class="bg-slate-800/90 px-1.5 py-0.5 rounded truncate">
+                <span class="text-slate-400">CPU/FPS:</span> <strong id="chat-live-perf" class="text-emerald-300">--ms • -- FPS</strong>
+              </div>
+              <div class="bg-slate-800/90 px-1.5 py-0.5 rounded truncate">
+                <span class="text-slate-400">Bat/Rede:</span> <strong id="chat-live-bat-net" class="text-purple-300">-- • --</strong>
+              </div>
+            </div>
+          </div>
+
           <div class="flex items-center justify-between">
             <span class="text-[10px] text-gray-700 font-bold">Apoio Avançado (Limpeza Profunda, Sensores e Reparos PC):</span>
             <span class="px-1.5 py-0.5 bg-blue-100 text-blue-800 border border-blue-200 rounded text-[9px] font-bold">Permissão LGPD</span>
@@ -2995,6 +3023,37 @@
         batDrain.innerText = m.batteryDrain || "Conectado";
       }
 
+      // Atualiza em tempo real o painel superior do Chat Bot e os cartões vivos nas mensagens do Chat Bot
+      const chatLiveDev = document.getElementById('chat-live-device');
+      const chatLiveRam = document.getElementById('chat-live-ram');
+      const chatLiveSto = document.getElementById('chat-live-storage');
+      const chatLivePerf = document.getElementById('chat-live-perf');
+      const chatLiveBatNet = document.getElementById('chat-live-bat-net');
+
+      const resolvedDevName = (demoState.user && demoState.user.role === 'client' && demoState.user.device && !/Android Identificado/i.test(demoState.user.device))
+        ? demoState.user.device
+        : (realHardwareProfile.deviceName || "Dispositivo Real");
+      const liveRamStr = `${m.ram}% (${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB)`;
+      const liveStoStr = `${m.storage}% (${m.storageUsed}/${m.storageTotal} GB)`;
+      const livePerfStr = `${m.cpuLatencyMs || realHardwareProfile.cpuLatencyMs}ms • ${m.fps || realHardwareProfile.measuredFps} FPS (${realHardwareProfile.measuredHz}Hz)`;
+      const liveBatNetStr = `${m.batteryHealth || 'AC'} • ${m.netLabel || realHardwareProfile.netType}`;
+
+      if (chatLiveDev) chatLiveDev.innerText = `${resolvedDevName} • ${realHardwareProfile.cpuCores} núcleos`;
+      if (chatLiveRam) chatLiveRam.innerText = liveRamStr;
+      if (chatLiveSto) chatLiveSto.innerText = liveStoStr;
+      if (chatLivePerf) chatLivePerf.innerText = livePerfStr;
+      if (chatLiveBatNet) chatLiveBatNet.innerText = liveBatNetStr;
+
+      document.querySelectorAll('.bot-live-telemetry-line').forEach(el => {
+        el.innerHTML = `📡 <strong>Tempo Real (${resolvedDevName}):</strong> RAM <strong>${liveRamStr}</strong> • Disco <strong>${liveStoStr}</strong> • CPU <strong>${m.cpuLatencyMs || realHardwareProfile.cpuLatencyMs}ms</strong> • Desempenho <strong>${m.performance}% (${m.fps || realHardwareProfile.measuredFps} FPS)</strong> • <strong>${liveBatNetStr}</strong>`;
+      });
+
+      const dcModal = document.getElementById('deep-clean-modal');
+      if (dcModal && !dcModal.classList.contains('hidden')) {
+        updateDeepCleanRealLabels();
+        recalcDeepCleanTotal();
+      }
+
       const auditBadge = document.getElementById('audit-count-badge');
       if (auditBadge) auditBadge.innerText = String(demoState.auditLogs.length);
 
@@ -3418,8 +3477,12 @@
       );
     }
 
-    function openHardwareTestModal() {
+    async function openHardwareTestModal() {
       document.getElementById('hardware-test-modal').classList.remove('hidden');
+      await collectRealHardwareTelemetry(false);
+      await runSingleSensorTest('touch');
+      await runSingleSensorTest('bat');
+      await runSingleSensorTest('net');
     }
 
     function closeHardwareTestModal() {
@@ -3767,9 +3830,64 @@
       );
     }
 
-    function openBotUacModal(taskKey = 'ram') {
+    function getDynamicUacTaskConfig(taskKey = 'ram') {
+      const base = BOT_UAC_TASKS[taskKey] || BOT_UAC_TASKS.ram;
+      const m = demoState.metrics;
+      const resCount = realHardwareProfile.resourceCount || 12;
+      const heapMB = realHardwareProfile.jsHeapUsedMB || 16;
+      const totalCleanBytes = (Math.round(heapMB * 1024 * 1024)) + (realHardwareProfile.resourceBufferBytes || 0) + (realHardwareProfile.storageUsageBytes || 0);
+      const cleanFormatted = formatBytesHuman(totalCleanBytes);
+      const pingStr = realHardwareProfile.realPingMs !== null ? `${realHardwareProfile.realPingMs}ms` : 'Online';
+
+      if (taskKey === 'ram') {
+        return {
+          ...base,
+          desc: `Você autoriza a IA do HelpTop a limpar ${resCount} buffers ativos (${heapMB} MB JS Heap) e otimizar a Memória RAM real (${m.ram}% — ${m.ramDetailLabel}) em ${realHardwareProfile.deviceName}?`,
+          steps: [
+            `Limpar ${resCount} buffers de recursos e liberar ${heapMB} MB do Heap em tempo real`,
+            `Otimizar alocação de Memória RAM atual (${m.ram}% • ${m.ramDetailLabel})`,
+            `Estabilizar latência da CPU (${m.cpuLatencyMs}ms em ${realHardwareProfile.cpuCores} núcleos)`
+          ]
+        };
+      }
+      if (taskKey === 'storage') {
+        return {
+          ...base,
+          desc: `Você autoriza a IA do HelpTop a limpar ${cleanFormatted} de caches/buffers detectados em tempo real e otimizar o armazenamento (${m.storageDetailLabel}) sem tocar em seus arquivos pessoais?`,
+          steps: [
+            `Limpar ${cleanFormatted} de buffers, CacheStorage e recursos temporários medidos em tempo real`,
+            `Otimizar partição de armazenamento atual (${m.storageDetailLabel})`,
+            `Preservar 100% das suas fotos, vídeos pessoais e conversas`
+          ]
+        };
+      }
+      if (taskKey === 'battery_heat' || taskKey === 'charging') {
+        return {
+          ...base,
+          steps: [
+            `Monitorar energia real atual: ${m.batteryHealth} (${m.batteryDrain})`,
+            `Reduzir carga térmica (${Number(m.temp).toFixed(1)}°C) e latência da CPU (${m.cpuLatencyMs}ms)`,
+            `Restringir processos ociosos em segundo plano em ${realHardwareProfile.deviceName}`
+          ]
+        };
+      }
+      if (taskKey === 'dns') {
+        return {
+          ...base,
+          steps: [
+            `Limpar tabela de cache DNS e buffers de rede (${realHardwareProfile.netType})`,
+            `Renovar rota de conectividade e testar ping real (${pingStr})`,
+            `Estabilizar taxa de transferência em ${realHardwareProfile.deviceName}`
+          ]
+        };
+      }
+      return base;
+    }
+
+    async function openBotUacModal(taskKey = 'ram') {
+      await collectRealHardwareTelemetry(false);
       currentUacTaskKey = taskKey;
-      const cfg = BOT_UAC_TASKS[taskKey] || BOT_UAC_TASKS.ram;
+      const cfg = getDynamicUacTaskConfig(taskKey);
       document.getElementById('uac-modal-title').innerText = cfg.title;
       document.getElementById('uac-modal-desc').innerText = cfg.desc;
       document.getElementById('uac-modal-cmd').innerText = `$ ${cfg.cmd}`;
@@ -3784,7 +3902,7 @@
 
     function confirmBotUacExecution(authorized) {
       closeBotUacModal();
-      const cfg = BOT_UAC_TASKS[currentUacTaskKey] || BOT_UAC_TASKS.ram;
+      const cfg = getDynamicUacTaskConfig(currentUacTaskKey);
       if (!authorized) {
         showBotManualGuideForTask(currentUacTaskKey);
         return;
@@ -4726,13 +4844,15 @@
       if (container) container.innerHTML = '';
     }
 
-    function openChatBotWithTyping() {
+    async function openChatBotWithTyping() {
       const container = document.getElementById('chat-messages-container');
       if (chatTypingTimeout) clearTimeout(chatTypingTimeout);
 
       goToScreen('chat');
+      await collectRealHardwareTelemetry(false);
+      syncUiMetrics();
 
-      // Mantém o histórico se já houver conversa ativa na sessão; se estiver vazio, inicia com saudação limpa
+      // Mantém o histórico se já houver conversa ativa na sessão; se estiver vazio, inicia com saudação + telemetria em tempo real
       if (container && container.children.length > 0) {
         container.scrollTop = container.scrollHeight;
         return;
@@ -4743,11 +4863,20 @@
 
       chatTypingTimeout = setTimeout(() => {
         removeTypingIndicator();
+        const m = demoState.metrics;
+        const devName = (demoState.user && demoState.user.device && !/Android Identificado/i.test(demoState.user.device))
+          ? demoState.user.device
+          : (realHardwareProfile.deviceName || "Dispositivo Real");
         appendBotMessage(
-          `Olá! Sou o assistente técnico do <strong>HelpTop</strong>. Me conta o que está acontecendo com o seu aparelho ou qual é a sua dúvida!`,
+          `Olá! Sou o assistente técnico do <strong>HelpTop</strong> conectado em <strong>tempo real</strong> ao seu <strong>${devName}</strong>.<br>
+          • <strong>RAM Real Agora:</strong> ${m.ram}% (${m.ramDetailLabel})<br>
+          • <strong>Armazenamento Real:</strong> ${m.storage}% (${m.storageDetailLabel})<br>
+          • <strong>CPU / Desempenho:</strong> ${realHardwareProfile.cpuCores} núcleos (${m.cpuLatencyMs}ms) • ${m.performance}% (${m.fps} FPS)<br>
+          • <strong>Energia &amp; Rede:</strong> ${m.batteryHealth} • ${m.netLabel}<br><br>
+          Me conta o que está acontecendo com o seu aparelho ou qual reparo deseja executar!`,
           { showSupportFooter: false, showAiCard: false }
         );
-      }, 500);
+      }, 450);
     }
 
     // Sincroniza todas as APIs reais disponíveis no navegador do aparelho ou PC
@@ -4874,8 +5003,23 @@
         </div>
       ` : '';
 
+      const m = demoState.metrics;
+      const resolvedDevName = (demoState.user && demoState.user.role === 'client' && demoState.user.device && !/Android Identificado/i.test(demoState.user.device))
+        ? demoState.user.device
+        : (realHardwareProfile.deviceName || "Dispositivo Real");
+      const liveRamStr = `${m.ram}% (${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB)`;
+      const liveStoStr = `${m.storage}% (${m.storageUsed}/${m.storageTotal} GB)`;
+      const liveBatNetStr = `${m.batteryHealth || 'AC'} • ${m.netLabel || realHardwareProfile.netType}`;
+
+      const liveTelemetryStripHtml = `
+        <div class="bot-live-telemetry-line p-1.5 bg-slate-900 text-emerald-300 border border-slate-700 rounded text-[9px] leading-snug">
+          📡 <strong>Tempo Real (${resolvedDevName}):</strong> RAM <strong>${liveRamStr}</strong> • Disco <strong>${liveStoStr}</strong> • CPU <strong>${m.cpuLatencyMs || realHardwareProfile.cpuLatencyMs}ms</strong> • Desempenho <strong>${m.performance}% (${m.fps || realHardwareProfile.measuredFps} FPS)</strong> • <strong>${liveBatNetStr}</strong>
+        </div>
+      `;
+
       div.innerHTML = `
         <div class="leading-relaxed"><strong>Chat Bot:</strong> ${text}</div>
+        ${liveTelemetryStripHtml}
         ${aiActionCardHtml}
         ${chipsHtml}
         ${footerHtml}
@@ -4946,13 +5090,17 @@
       return null;
     }
 
-    function processBotAiResponse(userInput) {
+    async function processBotAiResponse(userInput) {
       showTypingIndicator();
+      await collectRealHardwareTelemetry(false);
+      syncUiMetrics();
       const raw = (userInput || '').trim();
       const norm = raw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       const m = demoState.metrics;
       const userName = demoState.user ? demoState.user.name.split(' ')[0] : "você";
-      const userDevice = demoState.user ? (demoState.user.device || "seu aparelho") : "seu aparelho";
+      const userDevice = (demoState.user && demoState.user.device && !/Android Identificado/i.test(demoState.user.device))
+        ? demoState.user.device
+        : (realHardwareProfile.deviceName || "seu aparelho");
       const brandInfo = detectDeviceBrandTips(userDevice);
       botContext.turnCount++;
 
@@ -5263,15 +5411,17 @@
           const stage = botTopicCountMap.storage;
 
           if (stage === 1) {
+            const totalCleanBytes = (Math.round((realHardwareProfile.jsHeapUsedMB || 12) * 1024 * 1024)) + (realHardwareProfile.resourceBufferBytes || 0) + (realHardwareProfile.storageUsageBytes || 0);
+            const cleanFormatted = formatBytesHuman(totalCleanBytes);
             const statusStr = m.storage < 85
-              ? `Seu armazenamento já está em um nível seguro (<strong>${m.storage}%</strong> — ${m.storageUsed}/${m.storageTotal} GB).`
-              : `Seu armazenamento está crítico em <strong>${m.storage}%</strong> (${m.storageUsed}/${m.storageTotal} GB), o que reduz a velocidade do aparelho.`;
+              ? `Leitura em Tempo Real (${userDevice}): Armazenamento em nível seguro — <strong>${m.storage}%</strong> (${m.storageDetailLabel}).`
+              : `Leitura em Tempo Real (${userDevice}): Armazenamento crítico em <strong>${m.storage}%</strong> (${m.storageDetailLabel}), o que reduz a velocidade do sistema.`;
 
             appendBotMessage(
               `${statusStr}<br><br>
               🔍 <strong>Passo a Passo Manual para liberar espaço sem perder fotos pessoais:</strong><br>
               1. <strong>Mídias repetidas do WhatsApp:</strong> Vá em <em>WhatsApp &rarr; Configurações &rarr; Armazenamento e dados &rarr; Gerenciar armazenamento</em> e apague vídeos grandes de grupos.<br>
-              2. <strong>Caches ocultos (Redes Sociais/APKs):</strong> Toque em <strong>🧹 Limp. Profunda</strong> no topo desta tela ou autorize a IA abaixo para remover até 1.8 GB de arquivos temporários.<br>
+              2. <strong>Caches e buffers reais (${cleanFormatted} detectados agora):</strong> Toque em <strong>🧹 Limp. Profunda</strong> no topo desta tela ou autorize a IA abaixo.<br>
               3. <strong>Lixeira de Fotos:</strong> Esvazie a aba <em>Biblioteca &rarr; Lixeira</em> do Google Fotos/Galeria.`,
               { uacTask: 'storage' }
             );

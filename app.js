@@ -2214,9 +2214,61 @@ export default function App() {
     }
   }
 
+  function getDynamicUacTaskConfig(taskKey = 'ram') {
+    const base = BOT_UAC_TASKS[taskKey] || BOT_UAC_TASKS.ram;
+    const m = metrics;
+    const dc = getDeepCleanItemsBytes();
+    const cleanFormatted = formatBytesHuman(dc.totalSelected || dc.heap + dc.res + dc.storage);
+    const pingStr = m.pingMs !== null ? `${m.pingMs}ms` : 'Online';
+
+    if (taskKey === 'ram') {
+      return {
+        ...base,
+        desc: `Você autoriza a IA do HelpTop a limpar ${m.jsHeapUsedMB} MB de buffers do Heap e otimizar a Memória RAM real (${m.ram}% — ${m.ramDetailLabel}) em ${m.deviceName}?`,
+        steps: [
+          `Limpar buffers de recursos e liberar ${m.jsHeapUsedMB} MB do Heap em tempo real`,
+          `Otimizar alocação de Memória RAM atual (${m.ram}% • ${m.ramDetailLabel})`,
+          `Estabilizar latência da CPU (${m.cpuLatencyMs}ms em ${m.cpuCores} núcleos)`
+        ]
+      };
+    }
+    if (taskKey === 'storage') {
+      return {
+        ...base,
+        desc: `Você autoriza a IA do HelpTop a limpar ${cleanFormatted} de caches/buffers detectados em tempo real e otimizar o armazenamento (${m.storageDetailLabel}) sem tocar em seus arquivos pessoais?`,
+        steps: [
+          `Limpar ${cleanFormatted} de buffers, CacheStorage e recursos temporários medidos em tempo real`,
+          `Otimizar partição de armazenamento atual (${m.storageDetailLabel})`,
+          `Preservar 100% das suas fotos, vídeos pessoais e conversas`
+        ]
+      };
+    }
+    if (taskKey === 'battery_heat' || taskKey === 'charging') {
+      return {
+        ...base,
+        steps: [
+          `Monitorar energia real atual: ${m.batteryHealth} (${m.batteryDrain})`,
+          `Reduzir carga térmica (${Number(m.temp).toFixed(1)}°C) e latência da CPU (${m.cpuLatencyMs}ms)`,
+          `Restringir processos ociosos em segundo plano em ${m.deviceName}`
+        ]
+      };
+    }
+    if (taskKey === 'dns') {
+      return {
+        ...base,
+        steps: [
+          `Limpar tabela de cache DNS e buffers de rede (${m.netType})`,
+          `Renovar rota de conectividade e testar ping real (${pingStr})`,
+          `Estabilizar taxa de transferência em ${m.deviceName}`
+        ]
+      };
+    }
+    return base;
+  }
+
   function confirmBotUacExecution(authorized) {
     setShowUacModal(false);
-    const cfg = BOT_UAC_TASKS[currentUacTaskKey] || BOT_UAC_TASKS.ram;
+    const cfg = getDynamicUacTaskConfig(currentUacTaskKey);
     if (!authorized) {
       appendBotMessage(
         `${cfg.manualGuide}\n\n💡 Se preferir não fazer manualmente, toque no botão abaixo para a IA aplicar esse ajuste por você!`,
@@ -2268,19 +2320,21 @@ export default function App() {
     setChatMessages([]);
   }
 
-  function openChatBotWithTyping() {
+  async function openChatBotWithTyping() {
     goToScreen('chat');
+    const latest = await refreshRealHardwareTelemetry(false);
     if (chatMessages.length > 0) return;
 
     resetBotConversationContext();
     setIsBotTyping(true);
     setTimeout(() => {
       setIsBotTyping(false);
+      const devName = (currentUser && currentUser.device) ? currentUser.device : latest.deviceName;
       appendBotMessage(
-        'Olá! Sou o assistente técnico do HelpTop. Me conta o que está acontecendo com o seu aparelho ou qual é a sua dúvida!',
+        `Olá! Sou o assistente técnico do HelpTop conectado em tempo real ao seu ${devName}.\n• RAM Real Agora: ${latest.ram}% (${latest.ramDetailLabel})\n• Armazenamento Real: ${latest.storage}% (${latest.storageDetailLabel})\n• CPU / Desempenho: ${latest.cpuCores} núcleos (${latest.cpuLatencyMs}ms) • ${latest.performance}% (${latest.fps} FPS)\n• Energia & Rede: ${latest.batteryHealth} • ${latest.netLabel}\n\nMe conta o que está acontecendo com o seu aparelho ou qual reparo deseja executar!`,
         { showSupportFooter: false, showAiCard: false }
       );
-    }, 450);
+    }, 400);
   }
 
   function appendUserMessage(text) {
@@ -2355,11 +2409,11 @@ export default function App() {
     );
   }
 
-  function processBotAiResponse(userInput) {
+  async function processBotAiResponse(userInput) {
     setIsBotTyping(true);
+    const m = await refreshRealHardwareTelemetry(false);
     const raw = (userInput || '').trim();
     const norm = raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const m = metrics;
     const userName = currentUser ? currentUser.name.split(' ')[0] : 'você';
     const userDevice = (currentUser && currentUser.device) ? currentUser.device : (m.deviceName || 'seu aparelho');
     const brandInfo = detectDeviceBrandTips(userDevice);
@@ -3968,8 +4022,64 @@ export default function App() {
           </View>
         </View>
 
-        {/* Barra de Ferramentas Avançadas do Chat Bot */}
+        {/* Barra de Ferramentas Avançadas e Monitor em Tempo Real do Chat Bot */}
         <View style={styles.chatToolbarBox}>
+          {/* Painel de Telemetria em Tempo Real do Chat Bot */}
+          <View style={{
+            backgroundColor: '#0f172a',
+            borderRadius: 8,
+            padding: 6,
+            borderWidth: 1,
+            borderColor: '#1e40af',
+            marginBottom: 6
+          }}>
+            <View style={[styles.rowBetween, { borderBottomWidth: 1, borderBottomColor: '#334155', paddingBottom: 4, marginBottom: 4 }]}>
+              <View style={[styles.rowCenter, { flex: 1, paddingRight: 4 }]}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#34d399', marginRight: 5 }} />
+                <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#6ee7b7', marginRight: 4 }}>TEMPO REAL:</Text>
+                <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#fff', flex: 1 }} numberOfLines={1}>
+                  {(currentUser && currentUser.device) ? currentUser.device : metrics.deviceName} • {metrics.cpuCores} núcleos
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={{ backgroundColor: '#2563eb', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}
+                onPress={async () => {
+                  const latest = await refreshRealHardwareTelemetry(true);
+                  appendBotMessage(
+                    `✓ Telemetria Real Sincronizada (${latest.deviceName}):\n• SO / CPU: ${latest.osLabel} • ${latest.cpuLabel} (Latência: ${latest.cpuLatencyMs}ms)\n• GPU Real: ${latest.gpuLabel}\n• Memória Real: ${latest.ram}% (${latest.ramDetailLabel})\n• Armazenamento Real: ${latest.storageDetailLabel}\n• Energia & Rede: ${latest.batteryHealth} • ${latest.netLabel}`,
+                    { showSupportFooter: false, showAiCard: false }
+                  );
+                }}
+              >
+                <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#fff' }}>🔄 Sincronizar</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.rowGap6}>
+              <View style={{ flex: 1, backgroundColor: '#1e293b', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, color: '#94a3b8' }} numberOfLines={1}>
+                  RAM: <Text style={{ fontWeight: 'bold', color: '#67e8f9' }}>{metrics.ram}% ({metrics.ramDetailLabel})</Text>
+                </Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: '#1e293b', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, color: '#94a3b8' }} numberOfLines={1}>
+                  Disco: <Text style={{ fontWeight: 'bold', color: '#fcd34d' }}>{metrics.storage}% ({metrics.storageDetailLabel})</Text>
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.rowGap6, { marginTop: 3 }]}>
+              <View style={{ flex: 1, backgroundColor: '#1e293b', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, color: '#94a3b8' }} numberOfLines={1}>
+                  CPU/FPS: <Text style={{ fontWeight: 'bold', color: '#6ee7b7' }}>{metrics.cpuLatencyMs}ms • {metrics.fps} FPS ({metrics.hz}Hz)</Text>
+                </Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: '#1e293b', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, color: '#94a3b8' }} numberOfLines={1}>
+                  Bat/Rede: <Text style={{ fontWeight: 'bold', color: '#d8b4fe' }}>{metrics.batteryHealth} • {metrics.netLabel}</Text>
+                </Text>
+              </View>
+            </View>
+          </View>
+
           <View style={styles.rowBetween}>
             <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#374151' }}>
               Apoio Avançado (Limpeza, Sensores Reais e IA):
@@ -3982,19 +4092,29 @@ export default function App() {
           <View style={[styles.rowGap6, { marginTop: 6 }]}>
             <TouchableOpacity
               style={[styles.chatToolBtn, { backgroundColor: '#fffbeb', borderColor: '#fcd34d' }]}
-              onPress={() => setShowDeepCleanModal(true)}
+              onPress={async () => {
+                await refreshRealHardwareTelemetry(false);
+                setShowDeepCleanModal(true);
+              }}
             >
               <Text style={[styles.chatToolBtnText, { color: '#78350f' }]}>🧹 Limp. Profunda</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.chatToolBtn, { backgroundColor: '#eef2ff', borderColor: '#a5b4fc' }]}
-              onPress={() => setShowHardwareTestModal(true)}
+              onPress={async () => {
+                setShowHardwareTestModal(true);
+                await refreshRealHardwareTelemetry(false);
+                await runSingleSensorTest('touch');
+                await runSingleSensorTest('bat');
+                await runSingleSensorTest('net');
+              }}
             >
               <Text style={[styles.chatToolBtnText, { color: '#312e81' }]}>🩺 Testar Sensores</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.chatToolBtn, { backgroundColor: '#eff6ff', borderColor: '#93c5fd' }]}
-              onPress={() => {
+              onPress={async () => {
+                await refreshRealHardwareTelemetry(false);
                 setCurrentUacTaskKey('ram');
                 setShowUacModal(true);
               }}
@@ -4036,13 +4156,33 @@ export default function App() {
               );
             }
 
-            const taskCfg = msg.uacTask ? (BOT_UAC_TASKS[msg.uacTask] || BOT_UAC_TASKS.ram) : null;
+            const taskCfg = msg.uacTask ? getDynamicUacTaskConfig(msg.uacTask) : null;
+            const liveDevName = (currentUser && currentUser.device) ? currentUser.device : metrics.deviceName;
             return (
               <View key={msg.id} style={styles.chatBubbleBot}>
                 <Text style={styles.chatBubbleText}>
                   <Text style={{ fontWeight: 'bold' }}>Chat Bot: </Text>
                   {msg.text}
                 </Text>
+
+                {/* Faixa de Telemetria Viva em Tempo Real dentro de cada resposta do Chat Bot */}
+                <View style={{
+                  backgroundColor: '#0f172a',
+                  borderColor: '#334155',
+                  borderWidth: 1,
+                  borderRadius: 6,
+                  padding: 6,
+                  marginTop: 6
+                }}>
+                  <Text style={{ fontSize: 9, color: '#6ee7b7', lineHeight: 13 }}>
+                    📡 <Text style={{ fontWeight: 'bold' }}>Tempo Real ({liveDevName}):</Text>{' '}
+                    RAM <Text style={{ fontWeight: 'bold', color: '#67e8f9' }}>{metrics.ram}% ({metrics.ramDetailLabel})</Text> •{' '}
+                    Disco <Text style={{ fontWeight: 'bold', color: '#fcd34d' }}>{metrics.storage}% ({metrics.storageDetailLabel})</Text> •{' '}
+                    CPU <Text style={{ fontWeight: 'bold', color: '#fff' }}>{metrics.cpuLatencyMs}ms</Text> •{' '}
+                    Desempenho <Text style={{ fontWeight: 'bold', color: '#6ee7b7' }}>{metrics.performance}% ({metrics.fps} FPS)</Text> •{' '}
+                    {metrics.batteryHealth} • {metrics.netLabel}
+                  </Text>
+                </View>
 
                 {msg.isProtocolCard && msg.protocolCode && (
                   <View style={styles.protocolGeneratedCard}>
@@ -5009,7 +5149,7 @@ export default function App() {
   // RENDERIZADORES DOS MODAIS INTERATIVOS
   // ==========================================================================
   const dcInfo = getDeepCleanItemsBytes();
-  const currentUacCfg = BOT_UAC_TASKS[currentUacTaskKey] || BOT_UAC_TASKS.ram;
+  const currentUacCfg = getDynamicUacTaskConfig(currentUacTaskKey);
   const statusBarNetStr = `${metrics.netType}${metrics.pingMs !== null ? ` (${metrics.pingMs}ms)` : ''} | ${
     metrics.batteryPct !== null ? `Bat: ${metrics.batteryPct}%${metrics.batteryCharging ? ' ⚡' : ''}` : 'AC ⚡'
   }`;
