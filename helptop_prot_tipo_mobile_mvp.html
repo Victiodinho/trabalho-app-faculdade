@@ -72,22 +72,7 @@
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
 
-  <!-- Barra superior discreta com Sincronização, 2ª Tela Rápida e Zerar Tudo -->
-  <div class="w-[360px] mb-2 flex items-center justify-between gap-1 text-xs text-gray-700">
-    <button type="button" onclick="openFirebaseModal()" class="px-2 py-1 bg-white border border-orange-300 rounded hover:bg-orange-50 text-[10px] font-bold text-orange-800 shadow-sm flex items-center gap-1">
-      <span>🔥</span>
-      <span id="firebase-top-status">Sync Ativo</span>
-    </button>
-    <button type="button" onclick="openSecondSyncedWindow()" class="px-2 py-1 bg-blue-700 hover:bg-blue-800 text-white rounded text-[10px] font-bold shadow-sm flex items-center gap-1" title="Abre uma 2ª janela conectada em tempo real para testar Técnico e Usuário lado a lado">
-      <span>🖥️</span>
-      <span>Abrir 2ª Tela</span>
-    </button>
-    <button type="button" onclick="resetDemoState()" class="px-2 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 text-[10px] font-medium shadow-sm">
-      Zerar Tudo
-    </button>
-  </div>
-
-  <!-- MOLDURA DO CELULAR -->
+  <!-- MOLDURA DO CELULAR (Sincronização em tempo real 100% ativa em segundo plano) -->
   <div class="phone-frame relative">
 
     <!-- Barra de Status do Android / Sistema Real -->

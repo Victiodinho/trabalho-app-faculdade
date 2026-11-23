@@ -787,6 +787,15 @@ export default function App() {
   const [registeredUsers, setRegisteredUsers] = useState([]);
   const [supportTickets, setSupportTickets] = useState([]);
 
+  const registeredUsersRef = useRef([]);
+  const supportTicketsRef = useRef([]);
+  const isAuthenticatedRef = useRef(false);
+  const currentUserRef = useRef(null);
+  const activeTechProtocolRef = useRef(null);
+  const generatedProtocolRef = useRef(null);
+  const broadcastChannelRef = useRef(null);
+  const mqttPublishRef = useRef(null);
+
   // Telemetria Real do Hardware (Aparelho Físico Android/iOS ou PC)
   const [metrics, setMetrics] = useState({
     deviceName: 'Detectando Hardware...',
@@ -965,6 +974,169 @@ export default function App() {
     return data;
   }
 
+  // Mantém refs sincronizadas para callbacks de WebSocket / MQTT / BroadcastChannel em segundo plano
+  useEffect(() => { registeredUsersRef.current = registeredUsers; }, [registeredUsers]);
+  useEffect(() => { supportTicketsRef.current = supportTickets; }, [supportTickets]);
+  useEffect(() => { isAuthenticatedRef.current = isAuthenticated; }, [isAuthenticated]);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+  useEffect(() => { activeTechProtocolRef.current = activeTechTicketProtocol; }, [activeTechTicketProtocol]);
+  useEffect(() => { generatedProtocolRef.current = generatedProtocolCode; }, [generatedProtocolCode]);
+
+  function encodeUtf8Bytes(str) {
+    if (typeof TextEncoder !== 'undefined') {
+      return Array.from(new TextEncoder().encode(str));
+    }
+    const utf8 = unescape(encodeURIComponent(str));
+    const arr = [];
+    for (let i = 0; i < utf8.length; i++) arr.push(utf8.charCodeAt(i));
+    return arr;
+  }
+
+  function decodeUtf8Bytes(uint8Arr) {
+    if (typeof TextDecoder !== 'undefined') {
+      return new TextDecoder().decode(uint8Arr);
+    }
+    let s = '';
+    for (let i = 0; i < uint8Arr.length; i++) s += String.fromCharCode(uint8Arr[i]);
+    try {
+      return decodeURIComponent(escape(s));
+    } catch (e) {
+      return s;
+    }
+  }
+
+  function encodeMqttRemainingLength(len) {
+    const bytes = [];
+    let x = len;
+    do {
+      let encodedByte = x % 128;
+      x = Math.floor(x / 128);
+      if (x > 0) encodedByte = encodedByte | 128;
+      bytes.push(encodedByte);
+    } while (x > 0);
+    return bytes;
+  }
+
+  function applyIncomingSyncPayload(packet) {
+    if (!packet || packet.senderId === clientInstanceIdRef.current) return;
+    if (packet.timestamp && packet.timestamp <= lastKnownSyncTsRef.current) return;
+    if (packet.timestamp) lastKnownSyncTsRef.current = packet.timestamp;
+
+    const meta = packet.eventMeta;
+    if (meta && meta.action === 'RESET_ALL') {
+      registeredUsersRef.current = [];
+      supportTicketsRef.current = [];
+      setRegisteredUsers([]);
+      setSupportTickets([]);
+      UniversalStorage.removeItem(USERS_STORAGE_KEY);
+      UniversalStorage.removeItem(TICKETS_STORAGE_KEY);
+      return;
+    }
+
+    // 1. Mescla inteligente de usuários entre dispositivos (Celular + PC)
+    if (Array.isArray(packet.users)) {
+      let nextUsers = [...registeredUsersRef.current];
+      if (meta && meta.action === 'DELETE_USER') {
+        nextUsers = packet.users;
+      } else {
+        packet.users.forEach(incUser => {
+          if (!incUser || !incUser.email) return;
+          const idx = nextUsers.findIndex(
+            u => u.email.toLowerCase() === incUser.email.toLowerCase() && u.role === incUser.role
+          );
+          if (idx >= 0) nextUsers[idx] = incUser;
+          else nextUsers.push(incUser);
+        });
+      }
+      registeredUsersRef.current = nextUsers;
+      setRegisteredUsers(nextUsers);
+      UniversalStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
+    }
+
+    // 2. Mescla inteligente de chamados e mensagens em tempo real
+    let mergedTickets = [...supportTicketsRef.current];
+    if (Array.isArray(packet.tickets)) {
+      packet.tickets.forEach(incTicket => {
+        if (!incTicket || !incTicket.protocol) return;
+        const idx = mergedTickets.findIndex(t => t.protocol === incTicket.protocol);
+        if (idx >= 0) {
+          const localCount = Array.isArray(mergedTickets[idx].messages) ? mergedTickets[idx].messages.length : 0;
+          const incCount = Array.isArray(incTicket.messages) ? incTicket.messages.length : 0;
+          if (
+            incCount >= localCount ||
+            incTicket.status !== mergedTickets[idx].status ||
+            incTicket.rating !== mergedTickets[idx].rating ||
+            JSON.stringify(incTicket.remoteSession) !== JSON.stringify(mergedTickets[idx].remoteSession)
+          ) {
+            mergedTickets[idx] = incTicket;
+          }
+        } else {
+          mergedTickets.unshift(incTicket);
+        }
+      });
+      supportTicketsRef.current = mergedTickets;
+      setSupportTickets(mergedTickets);
+      UniversalStorage.setItem(TICKETS_STORAGE_KEY, JSON.stringify(mergedTickets));
+    }
+
+    const authUser = currentUserRef.current;
+    if (!isAuthenticatedRef.current || !authUser) return;
+
+    // Notificações ao vivo para o Suporte Técnico logado
+    if (authUser.role === 'tech') {
+      if (!activeTechProtocolRef.current && mergedTickets.length > 0) {
+        setActiveTechTicketProtocol(mergedTickets[0].protocol);
+      }
+      if (meta && (meta.action === 'NEW_TICKET' || meta.action === 'CLIENT_MSG')) {
+        const targetTicket = mergedTickets.find(t => t.protocol === meta.protocol);
+        if (targetTicket) {
+          playBeepOrVibrate(880, 220);
+          setCallPopupState({
+            visible: true,
+            headerText: meta.action === 'NEW_TICKET' ? '🔔 Novo Chamado de Suporte!' : '💬 Nova Mensagem do Cliente!',
+            protocol: targetTicket.protocol,
+            ticket: targetTicket,
+            previewText: meta.previewText || 'Novo chamado recebido!',
+            targetRole: 'tech'
+          });
+        }
+      } else if (meta && (meta.action === 'CLIENT_TELEMETRY' || meta.action === 'CLIENT_RATED')) {
+        playBeepOrVibrate(780, 150);
+        showToastNotice(meta.previewText || 'Atualização recebida do cliente!');
+      }
+    }
+
+    // Notificações ao vivo para o Cliente logado
+    if (authUser.role === 'client') {
+      const myProto = generatedProtocolRef.current;
+      if (myProto) {
+        const myTicket = mergedTickets.find(t => t.protocol === myProto);
+        if (myTicket) {
+          if (myTicket.metrics) {
+            setMetrics(prev => ({ ...prev, ...myTicket.metrics }));
+          }
+          if (meta && meta.protocol === myProto && meta.action === 'TECH_REMOTE') {
+            addAuditLogEntry('PÓS-ANÁLISE', meta.previewText || `Ação remota executada pelo Suporte no protocolo ${myProto}.`);
+          }
+          if (meta && meta.protocol === myProto && (meta.action === 'TECH_ACCEPTED' || meta.action === 'TECH_MSG' || meta.action === 'TECH_REMOTE')) {
+            playBeepOrVibrate(960, 200);
+            setFloatingBannerState({
+              visible: true,
+              title: `Suporte (${myTicket.assignedTech || 'Técnico'}) — ${myTicket.protocol}`,
+              text: meta.previewText || 'Nova atualização no seu chamado!',
+              role: 'client',
+              protocol: myTicket.protocol
+            });
+            if (floatingBannerTimerRef.current) clearTimeout(floatingBannerTimerRef.current);
+            floatingBannerTimerRef.current = setTimeout(() => {
+              setFloatingBannerState(prev => ({ ...prev, visible: false }));
+            }, 6500);
+          }
+        }
+      }
+    }
+  }
+
   useEffect(() => {
     updateClockNow();
     const clockTimer = setInterval(updateClockNow, 20000);
@@ -1000,14 +1172,21 @@ export default function App() {
       const savedUsers = UniversalStorage.getItem(USERS_STORAGE_KEY);
       if (savedUsers) {
         const parsedU = JSON.parse(savedUsers);
-        if (Array.isArray(parsedU)) setRegisteredUsers(parsedU);
+        if (Array.isArray(parsedU)) {
+          registeredUsersRef.current = parsedU;
+          setRegisteredUsers(parsedU);
+        }
       }
       const savedTickets = UniversalStorage.getItem(TICKETS_STORAGE_KEY);
       if (savedTickets) {
         const parsedT = JSON.parse(savedTickets);
         if (Array.isArray(parsedT)) {
+          supportTicketsRef.current = parsedT;
           setSupportTickets(parsedT);
-          if (parsedT.length > 0) setActiveTechTicketProtocol(parsedT[0].protocol);
+          if (parsedT.length > 0) {
+            activeTechProtocolRef.current = parsedT[0].protocol;
+            setActiveTechTicketProtocol(parsedT[0].protocol);
+          }
         }
       }
     } catch (e) {}
@@ -1017,9 +1196,192 @@ export default function App() {
       refreshRealHardwareTelemetry(false);
     }, 4000);
 
+    // ========================================================================
+    // CONEXÃO EM TEMPO REAL AUTOMÁTICA EM SEGUNDO PLANO (SEM PRECISAR DE BOTÃO)
+    // 1. BroadcastChannel entre abas
+    // ========================================================================
+    const MQTT_TOPIC_SYNC = 'helptop_mvp_2026/realtime_zero_v3';
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('helptop_zero_sync_v3');
+        broadcastChannelRef.current = bc;
+        bc.onmessage = ev => {
+          if (!ev || !ev.data || ev.data.senderId === clientInstanceIdRef.current) return;
+          if (ev.data.type === 'HELPTOP_REQUEST_SYNC') {
+            persistUsersAndTickets(registeredUsersRef.current, supportTicketsRef.current);
+            return;
+          }
+          if (ev.data.type === 'HELPTOP_SYNC_STATE') {
+            applyIncomingSyncPayload(ev.data);
+          }
+        };
+        bc.postMessage({ type: 'HELPTOP_REQUEST_SYNC', senderId: clientInstanceIdRef.current, timestamp: Date.now() });
+      }
+    } catch (e) {}
+
+    // 2. Listener de storage + polling local a cada 1s
+    const onStorageEvent = ev => {
+      if (ev && ev.key === SYNC_PACKET_KEY && ev.newValue) {
+        try {
+          const data = JSON.parse(ev.newValue);
+          if (data && data.senderId !== clientInstanceIdRef.current) {
+            applyIncomingSyncPayload(data);
+          }
+        } catch (err) {}
+      }
+    };
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('storage', onStorageEvent);
+    }
+
+    const storagePollTimer = setInterval(() => {
+      try {
+        const rawPacket = UniversalStorage.getItem(SYNC_PACKET_KEY);
+        if (rawPacket) {
+          const parsed = JSON.parse(rawPacket);
+          if (parsed && parsed.senderId !== clientInstanceIdRef.current && parsed.timestamp > lastKnownSyncTsRef.current) {
+            applyIncomingSyncPayload(parsed);
+          }
+        }
+      } catch (e) {}
+    }, 1000);
+
+    // 3. Cliente MQTT 3.1.1 Nativo via WebSocket (wss://broker.emqx.io:8084/mqtt)
+    // Conecta Celular (Expo Go / Snack / Web) e PC pela internet sem bibliotecas externas!
+    let wsMqtt = null;
+    let mqttPingTimer = null;
+    let mqttReconnectTimer = null;
+    let isUnmounted = false;
+    const topicBytes = encodeUtf8Bytes(MQTT_TOPIC_SYNC);
+
+    function publishMqttPayload(jsonStr, retain = true) {
+      try {
+        if (!wsMqtt || wsMqtt.readyState !== 1) return;
+        const payloadBytes = encodeUtf8Bytes(jsonStr);
+        const varHeader = [(topicBytes.length >> 8) & 0xff, topicBytes.length & 0xff, ...topicBytes];
+        const remLenBytes = encodeMqttRemainingLength(varHeader.length + payloadBytes.length);
+        const headerByte = retain ? 0x31 : 0x30;
+        const packet = new Uint8Array([headerByte, ...remLenBytes, ...varHeader, ...payloadBytes]);
+        wsMqtt.send(packet.buffer);
+      } catch (e) {}
+    }
+
+    mqttPublishRef.current = publishMqttPayload;
+
+    function connectMqttWebSocket() {
+      if (isUnmounted || typeof WebSocket === 'undefined') return;
+      try {
+        wsMqtt = new WebSocket('wss://broker.emqx.io:8084/mqtt', 'mqtt');
+        wsMqtt.binaryType = 'arraybuffer';
+
+        wsMqtt.onopen = () => {
+          const cid = 'ht_' + Math.random().toString(16).substring(2, 10);
+          const cidBytes = encodeUtf8Bytes(cid);
+          const varHeader = [0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x04, 0x02, 0x00, 0x3c];
+          const payload = [0x00, cidBytes.length, ...cidBytes];
+          const remLen = encodeMqttRemainingLength(varHeader.length + payload.length);
+          const connectPkt = new Uint8Array([0x10, ...remLen, ...varHeader, ...payload]);
+          wsMqtt.send(connectPkt.buffer);
+        };
+
+        wsMqtt.onmessage = ev => {
+          try {
+            if (!ev || !ev.data) return;
+            const bytes = new Uint8Array(ev.data);
+            if (bytes.length < 2) return;
+            const packetType = bytes[0] & 0xf0;
+
+            // CONNACK (0x20) -> Envia SUBSCRIBE no tópico e solicita estado atual
+            if (packetType === 0x20) {
+              setSyncStatusLabel('Nuvem Online');
+              const subVar = [0x00, 0x01];
+              const subPay = [(topicBytes.length >> 8) & 0xff, topicBytes.length & 0xff, ...topicBytes, 0x00];
+              const subLen = encodeMqttRemainingLength(subVar.length + subPay.length);
+              const subPkt = new Uint8Array([0x82, ...subLen, ...subVar, ...subPay]);
+              wsMqtt.send(subPkt.buffer);
+
+              setTimeout(() => {
+                publishMqttPayload(
+                  JSON.stringify({
+                    type: 'HELPTOP_REQUEST_SYNC',
+                    senderId: clientInstanceIdRef.current,
+                    timestamp: Date.now()
+                  }),
+                  false
+                );
+              }, 200);
+
+              if (mqttPingTimer) clearInterval(mqttPingTimer);
+              mqttPingTimer = setInterval(() => {
+                try {
+                  if (wsMqtt && wsMqtt.readyState === 1) {
+                    wsMqtt.send(new Uint8Array([0xc0, 0x00]).buffer);
+                  }
+                } catch (e) {}
+              }, 22000);
+              return;
+            }
+
+            // PUBLISH recebido (0x30)
+            if (packetType === 0x30) {
+              let multiplier = 1;
+              let remLength = 0;
+              let idx = 1;
+              let encodedByte = 0;
+              do {
+                encodedByte = bytes[idx++];
+                remLength += (encodedByte & 127) * multiplier;
+                multiplier *= 128;
+              } while ((encodedByte & 128) !== 0 && idx < 5);
+
+              const tLen = (bytes[idx] << 8) | bytes[idx + 1];
+              idx += 2 + tLen;
+              const qos = (bytes[0] >> 1) & 0x03;
+              if (qos > 0) idx += 2;
+
+              const payloadSlice = bytes.subarray(idx);
+              const jsonStr = decodeUtf8Bytes(payloadSlice);
+              const parsed = JSON.parse(jsonStr);
+              if (!parsed || parsed.senderId === clientInstanceIdRef.current) return;
+
+              if (parsed.type === 'HELPTOP_REQUEST_SYNC') {
+                if (registeredUsersRef.current.length > 0 || supportTicketsRef.current.length > 0) {
+                  persistUsersAndTickets(registeredUsersRef.current, supportTicketsRef.current);
+                }
+                return;
+              }
+              if (parsed.type === 'HELPTOP_SYNC_STATE') {
+                applyIncomingSyncPayload(parsed);
+              }
+            }
+          } catch (e) {}
+        };
+
+        wsMqtt.onclose = () => {
+          if (mqttPingTimer) clearInterval(mqttPingTimer);
+          if (!isUnmounted) {
+            mqttReconnectTimer = setTimeout(connectMqttWebSocket, 3500);
+          }
+        };
+
+        wsMqtt.onerror = () => {};
+      } catch (e) {}
+    }
+
+    connectMqttWebSocket();
+
     return () => {
+      isUnmounted = true;
       clearInterval(clockTimer);
       clearInterval(telemetryInterval);
+      clearInterval(storagePollTimer);
+      if (mqttPingTimer) clearInterval(mqttPingTimer);
+      if (mqttReconnectTimer) clearTimeout(mqttReconnectTimer);
+      try { if (wsMqtt) wsMqtt.close(); } catch (e) {}
+      try { if (broadcastChannelRef.current) broadcastChannelRef.current.close(); } catch (e) {}
+      if (typeof window !== 'undefined' && window.removeEventListener) {
+        window.removeEventListener('storage', onStorageEvent);
+      }
       if (rafId && typeof cancelAnimationFrame !== 'undefined') {
         cancelAnimationFrame(rafId);
       }
@@ -1094,25 +1456,45 @@ export default function App() {
   }
 
   function persistUsersAndTickets(nextUsers, nextTickets, eventMeta = null) {
+    const resolvedUsers = Array.isArray(nextUsers) ? nextUsers : registeredUsersRef.current;
+    const resolvedTickets = Array.isArray(nextTickets) ? nextTickets : supportTicketsRef.current;
+
     if (Array.isArray(nextUsers)) {
+      registeredUsersRef.current = nextUsers;
       setRegisteredUsers(nextUsers);
       UniversalStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
     }
     if (Array.isArray(nextTickets)) {
+      supportTicketsRef.current = nextTickets;
       setSupportTickets(nextTickets);
       UniversalStorage.setItem(TICKETS_STORAGE_KEY, JSON.stringify(nextTickets));
     }
+
     const nowTs = Date.now();
     lastKnownSyncTsRef.current = nowTs;
     const packet = {
       type: 'HELPTOP_SYNC_STATE',
       senderId: clientInstanceIdRef.current,
       timestamp: nowTs,
-      users: Array.isArray(nextUsers) ? nextUsers : registeredUsers,
-      tickets: Array.isArray(nextTickets) ? nextTickets : supportTickets,
+      users: resolvedUsers,
+      tickets: resolvedTickets,
       eventMeta
     };
-    UniversalStorage.setItem(SYNC_PACKET_KEY, JSON.stringify(packet));
+    const jsonPacket = JSON.stringify(packet);
+    UniversalStorage.setItem(SYNC_PACKET_KEY, jsonPacket);
+
+    try {
+      if (broadcastChannelRef.current) {
+        broadcastChannelRef.current.postMessage(packet);
+      }
+    } catch (e) {}
+
+    try {
+      if (mqttPublishRef.current) {
+        const shouldRetain = !(eventMeta && eventMeta.action === 'TYPING_STATE');
+        mqttPublishRef.current(jsonPacket, shouldRetain);
+      }
+    } catch (e) {}
   }
 
   function runConsoleExecution(title, logsArray, onComplete) {
@@ -2637,7 +3019,23 @@ export default function App() {
       <View style={styles.screenWelcome}>
         <View style={{ marginTop: 10, alignItems: 'center' }}>
           <View style={styles.logoBox}>
-            <Text style={{ fontSize: 38 }}>📱🔧</Text>
+            <View style={{
+              width: 30,
+              height: 52,
+              backgroundColor: '#fff',
+              borderWidth: 3,
+              borderColor: '#1976d2',
+              borderRadius: 6,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 4
+            }}>
+              <View style={{ width: 10, height: 2.5, backgroundColor: '#1976d2', borderRadius: 2 }} />
+              <View style={{ width: 20, height: 32, backgroundColor: '#e3f2fd', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 15 }}>🔧</Text>
+              </View>
+              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#1976d2' }} />
+            </View>
           </View>
           <Text style={styles.welcomeTitle}>HelpTop</Text>
           <View style={styles.welcomeSubtitlePill}>
@@ -4421,20 +4819,7 @@ export default function App() {
     <SafeAreaView style={styles.pageBackground}>
       <StatusBar barStyle="light-content" backgroundColor="#0d47a1" />
 
-      {/* Barra Superior de Sincronização, Alternância Cliente/Técnico (2ª Tela) e Zerar Tudo */}
-      <View style={styles.topUtilityBar}>
-        <TouchableOpacity style={styles.topSyncBtn} onPress={() => setShowFirebaseModal(true)}>
-          <Text style={styles.topSyncBtnText}>🔥 {syncStatusLabel}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.topSecondScreenBtn} onPress={quickSwitchRoleForTesting}>
-          <Text style={styles.topSecondScreenBtnText}>🖥️ Alternar 2ª Tela</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.topResetBtn} onPress={resetDemoState}>
-          <Text style={styles.topResetBtnText}>Zerar Tudo</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* MOLDURA DO CELULAR */}
+      {/* MOLDURA DO CELULAR (Sincronização em Tempo Real permanece 100% ativa em segundo plano) */}
       <View style={styles.phoneFrame}>
         {/* Barra de Status do Android / Sistema Real */}
         <View style={styles.phoneStatusBar}>
