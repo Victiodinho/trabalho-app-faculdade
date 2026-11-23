@@ -315,9 +315,9 @@ export async function collectRealDeviceTelemetry(currentFps = 60, currentHz = 60
 
   // 2. Memória RAM Física Real (%) e Armazenamento Real (%) — PC (WMI / Quota Real) e Mobile (ExpoFileSystem / ExpoDevice)
   const isMobileUa = Platform.OS === 'android' || Platform.OS === 'ios' || (nav.userAgent && /Android|iPhone|iPad|iPod/i.test(nav.userAgent));
-  let wmiData = null;
+  let wmiData = latestHostWmiTelemetry;
   if (!isMobileUa) {
-    wmiData = await fetchLocalPcWmiBridge();
+    fetchLocalPcWmiBridge().catch(() => {});
   }
 
   let ramTotalGB = Number(nav.deviceMemory || 0);

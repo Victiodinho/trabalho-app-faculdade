@@ -5,11 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HelpTop - Protótipo Mobile MVP</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <!-- SDK Firebase (opcional para chaves próprias) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <!-- Cliente MQTT WebSocket Público para Sincronização Real entre Celular Físico e PC pela Internet -->
-  <script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
   <style>
     body {
       font-family: Arial, Helvetica, sans-serif;
@@ -2166,9 +2161,10 @@
 
       const ua = navigator.userAgent || "";
       const isMobileUa = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.userAgentData && navigator.userAgentData.mobile);
-      let wmiData = null;
+      let wmiData = latestHostWmiTelemetry;
       if (!isMobileUa) {
-        wmiData = await fetchLocalPcWmiBridge();
+        // Atualiza a ponte local em segundo plano sem travar a interface
+        fetchLocalPcWmiBridge().catch(() => {});
       }
 
       // 1. Leitura real de JS Heap / Runtime
