@@ -2330,7 +2330,14 @@
       }
     }
 
+    let pureWsMqttPublish = null;
+
     function playNotificationBeep(freq = 880, durationMs = 180) {
+      try {
+        if (navigator.vibrate) {
+          navigator.vibrate(Math.min(400, Math.max(60, durationMs)));
+        }
+      } catch (e) {}
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return;
@@ -2346,6 +2353,97 @@
         osc.start();
         osc.stop(ctx.currentTime + durationMs / 1000);
       } catch (e) {}
+    }
+
+    function encodeMqttRemainingLength(len) {
+      const bytes = [];
+      let x = len;
+      do {
+        let encodedByte = x % 128;
+        x = Math.floor(x / 128);
+        if (x > 0) encodedByte = encodedByte | 128;
+        bytes.push(encodedByte);
+      } while (x > 0);
+      return bytes;
+    }
+
+    function initPureWebSocketMqttFallback() {
+      if (typeof WebSocket === 'undefined') return;
+      const enc = new TextEncoder();
+      const dec = new TextDecoder();
+      const topicBytes = Array.from(enc.encode(MQTT_TOPIC_SYNC));
+      let ws = null;
+      let pingTimer = null;
+
+      function publishRaw(jsonStr, retain = true) {
+        try {
+          if (!ws || ws.readyState !== 1) return;
+          const payloadBytes = Array.from(enc.encode(jsonStr));
+          const varHeader = [(topicBytes.length >> 8) & 0xff, topicBytes.length & 0xff, ...topicBytes];
+          const remLen = encodeMqttRemainingLength(varHeader.length + payloadBytes.length);
+          const packet = new Uint8Array([retain ? 0x31 : 0x30, ...remLen, ...varHeader, ...payloadBytes]);
+          ws.send(packet.buffer);
+        } catch (e) {}
+      }
+
+      pureWsMqttPublish = publishRaw;
+
+      function connectWs() {
+        try {
+          ws = new WebSocket('wss://broker.emqx.io:8084/mqtt', 'mqtt');
+          ws.binaryType = 'arraybuffer';
+          ws.onopen = () => {
+            const cid = 'ht_' + Math.random().toString(16).substring(2, 10);
+            const cidBytes = Array.from(enc.encode(cid));
+            const varHeader = [0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x04, 0x02, 0x00, 0x3c];
+            const payload = [0x00, cidBytes.length, ...cidBytes];
+            const remLen = encodeMqttRemainingLength(varHeader.length + payload.length);
+            ws.send(new Uint8Array([0x10, ...remLen, ...varHeader, ...payload]).buffer);
+          };
+          ws.onmessage = (ev) => {
+            try {
+              if (!ev || !ev.data) return;
+              const bytes = new Uint8Array(ev.data);
+              if (bytes.length < 2) return;
+              const pType = bytes[0] & 0xf0;
+              if (pType === 0x20) {
+                const subVar = [0x00, 0x01];
+                const subPay = [(topicBytes.length >> 8) & 0xff, topicBytes.length & 0xff, ...topicBytes, 0x00];
+                const subLen = encodeMqttRemainingLength(subVar.length + subPay.length);
+                ws.send(new Uint8Array([0x82, ...subLen, ...subVar, ...subPay]).buffer);
+                setTimeout(() => {
+                  publishRaw(JSON.stringify({ type: 'HELPTOP_REQUEST_SYNC', senderId: clientInstanceId, timestamp: Date.now() }), false);
+                }, 200);
+                if (pingTimer) clearInterval(pingTimer);
+                pingTimer = setInterval(() => {
+                  try { if (ws && ws.readyState === 1) ws.send(new Uint8Array([0xc0, 0x00]).buffer); } catch (e) {}
+                }, 22000);
+                return;
+              }
+              if (pType === 0x30) {
+                let mult = 1, remLen = 0, idx = 1, eb = 0;
+                do { eb = bytes[idx++]; remLen += (eb & 127) * mult; mult *= 128; } while ((eb & 128) !== 0 && idx < 5);
+                const tLen = (bytes[idx] << 8) | bytes[idx + 1];
+                idx += 2 + tLen;
+                if (((bytes[0] >> 1) & 0x03) > 0) idx += 2;
+                const parsed = JSON.parse(dec.decode(bytes.subarray(idx)));
+                if (!parsed || parsed.senderId === clientInstanceId) return;
+                if (parsed.type === 'HELPTOP_REQUEST_SYNC') {
+                  if (registeredUsers.length > 0 || supportTickets.length > 0) broadcastFullState();
+                  return;
+                }
+                applyIncomingSyncPayload(parsed);
+              }
+            } catch (e) {}
+          };
+          ws.onclose = () => {
+            if (pingTimer) clearInterval(pingTimer);
+            setTimeout(connectWs, 3500);
+          };
+          ws.onerror = () => {};
+        } catch (e) {}
+      }
+      connectWs();
     }
 
     function initRealtimeSync() {
@@ -2440,8 +2538,12 @@
               } catch (e) {}
             }
           });
+        } else {
+          initPureWebSocketMqttFallback();
         }
-      } catch (e) {}
+      } catch (e) {
+        initPureWebSocketMqttFallback();
+      }
     }
 
     function broadcastFullState(eventMeta = null) {
@@ -2480,9 +2582,11 @@
       });
 
       try {
+        const shouldRetain = !(eventMeta && eventMeta.action === 'TYPING_STATE');
         if (mqttCloudClient && mqttCloudClient.connected) {
-          const shouldRetain = !(eventMeta && eventMeta.action === 'TYPING_STATE');
           mqttCloudClient.publish(MQTT_TOPIC_SYNC, JSON.stringify(packet), { qos: 1, retain: shouldRetain });
+        } else if (pureWsMqttPublish) {
+          pureWsMqttPublish(JSON.stringify(packet), shouldRetain);
         }
       } catch (e) {}
     }
@@ -2549,7 +2653,12 @@
             if (idx >= 0) {
               const localMsgCount = Array.isArray(mergedTickets[idx].messages) ? mergedTickets[idx].messages.length : 0;
               const incMsgCount = Array.isArray(incTicket.messages) ? incTicket.messages.length : 0;
-              if (incMsgCount >= localMsgCount || incTicket.status !== mergedTickets[idx].status || incTicket.rating !== mergedTickets[idx].rating) {
+              if (
+                incMsgCount >= localMsgCount ||
+                incTicket.status !== mergedTickets[idx].status ||
+                incTicket.rating !== mergedTickets[idx].rating ||
+                JSON.stringify(incTicket.remoteSession) !== JSON.stringify(mergedTickets[idx].remoteSession)
+              ) {
                 mergedTickets[idx] = incTicket;
               }
             } else {
@@ -5904,7 +6013,7 @@
       } else {
         document.getElementById('support-header-status').innerHTML = `<strong>${ticket.protocol}:</strong> Na Fila de Atendimento`;
         if (techLabel) {
-          techLabel.innerHTML = `⏳ <strong>Aguardando técnico aceitar</strong> (abra a 2ª Tela como Suporte)`;
+          techLabel.innerHTML = `⏳ <strong>Aguardando técnico aceitar</strong> (conectado em tempo real)`;
         }
       }
 

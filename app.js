@@ -4015,7 +4015,7 @@ export default function App() {
               <Text style={{ fontSize: 10, color: '#166534', flex: 1 }}>
                 {activeTicket.assignedTech
                   ? `● Técnico Conectado: ${activeTicket.assignedTech}`
-                  : '⏳ Aguardando técnico assumir (use "Alternar 2ª Tela" no topo)'}
+                  : '⏳ Aguardando técnico assumir (conectado em tempo real)'}
               </Text>
               <TouchableOpacity
                 style={styles.smallOutlineBtn}
