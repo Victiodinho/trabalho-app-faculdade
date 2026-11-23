@@ -223,7 +223,7 @@
             <!-- Caixa de aviso (erro ou sucesso após cadastro) -->
             <div id="login-feedback-box" class="hidden mb-3 p-2.5 rounded border text-[11px]"></div>
 
-            <form id="form-login" onsubmit="handleLoginSubmit(event)" class="space-y-3">
+            <form id="form-login" onsubmit="handleLoginSubmit(event)" autocomplete="off" class="space-y-3">
               <div>
                 <label class="block font-bold text-gray-700 mb-1">Entrar como:</label>
                 <select id="login-role" onchange="toggleLoginTechCode()" class="w-full border border-gray-300 rounded px-2.5 py-2 bg-white text-gray-800">
@@ -234,13 +234,13 @@
 
               <div>
                 <label class="block font-bold text-gray-700 mb-1">Usuário:</label>
-                <input id="login-email" type="text" placeholder="Digite seu usuário cadastrado..." required class="w-full border border-gray-300 rounded px-2.5 py-2 text-gray-800">
+                <input id="login-email" type="text" autocomplete="off" placeholder="Digite seu usuário cadastrado..." required class="w-full border border-gray-300 rounded px-2.5 py-2 text-gray-800">
               </div>
 
               <div>
                 <label class="block font-bold text-gray-700 mb-1">Senha:</label>
                 <div class="flex gap-1">
-                  <input id="login-password" type="password" placeholder="Digite sua senha..." required class="flex-1 border border-gray-300 rounded px-2.5 py-2 text-gray-800">
+                  <input id="login-password" type="password" autocomplete="new-password" placeholder="Digite sua senha..." required class="flex-1 border border-gray-300 rounded px-2.5 py-2 text-gray-800">
                   <button type="button" onclick="togglePasswordVisibility('login-password')" class="px-2.5 border border-gray-300 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 text-[11px]">
                     Ver
                   </button>
@@ -255,7 +255,7 @@
                     📋 Colar Código
                   </button>
                 </div>
-                <input id="login-tech-code" type="text" placeholder="Código recebido por E-mail/SMS (SUP-XXXX)" class="w-full border border-gray-300 rounded px-2.5 py-1.5 bg-white text-gray-800 font-bold uppercase">
+                <input id="login-tech-code" type="text" autocomplete="off" placeholder="Código recebido por E-mail/SMS (SUP-XXXX)" class="w-full border border-gray-300 rounded px-2.5 py-1.5 bg-white text-gray-800 font-bold uppercase">
                 <div class="flex items-center justify-between pt-0.5 text-[10px]">
                   <span class="text-blue-800">Esqueceu seu código?</span>
                   <div class="flex gap-2">
@@ -1691,23 +1691,30 @@
     // =========================================================================
     // SISTEMA INICIANDO 100% DO ZERO (NENHUM USUÁRIO OU SUPORTE PRÉ-CADASTRADO)
     // =========================================================================
-    const USERS_STORAGE_KEY = "helptop_users_zero_v3";
-    const TICKETS_STORAGE_KEY = "helptop_tickets_zero_v3";
+    const USERS_STORAGE_KEY = "helptop_users_zero_v4";
+    const TICKETS_STORAGE_KEY = "helptop_tickets_zero_v4";
 
-    // Limpa chaves antigas que continham contas de teste (Carlos Silva / Rafael / Suporte)
+    // Limpa chaves antigas e garante que nenhum Suporte Técnico fique salvo de acessos anteriores
     try {
       localStorage.removeItem('helptop_registered_users');
       localStorage.removeItem('helptop_support_tickets');
       localStorage.removeItem('helptop_all_shared_tickets');
       localStorage.removeItem('helptop_users_clean_v2');
       localStorage.removeItem('helptop_tickets_clean_v2');
+      localStorage.removeItem('helptop_users_zero_v3');
+      localStorage.removeItem('helptop_tickets_zero_v3');
+      localStorage.removeItem('helptop_sync_packet_v3');
+      const clipOld = localStorage.getItem('helptop_clipboard_memory');
+      if (clipOld && /SUP-/i.test(clipOld)) {
+        localStorage.removeItem('helptop_clipboard_memory');
+      }
     } catch (e) {}
 
     let firebaseAppInstance = null;
     let firestoreDbInstance = null;
     let realtimeBroadcastChannel = null;
     let mqttCloudClient = null;
-    const MQTT_TOPIC_SYNC = "helptop_mvp_2026/realtime_zero_v3";
+    const MQTT_TOPIC_SYNC = "helptop_mvp_2026/realtime_zero_v4";
     const clientInstanceId = "ht_" + Math.random().toString(36).substring(2, 9);
     let lastClipboardMemory = "";
     let lastGeneratedTechCredential = "";
@@ -1718,15 +1725,22 @@
         const saved = localStorage.getItem(USERS_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
+          // Mantém em memória os técnicos criados apenas no acesso atual, nunca carregando técnico salvo de acessos antigos
+          const currentSessionTechs = Array.isArray(registeredUsers) ? registeredUsers.filter(u => u && u.role === 'tech') : [];
+          if (Array.isArray(parsed)) {
+            const onlyClients = parsed.filter(u => u && u.role !== 'tech');
+            return [...onlyClients, ...currentSessionTechs];
+          }
         }
       } catch (e) {}
-      return [];
+      return Array.isArray(registeredUsers) ? registeredUsers.filter(u => u && u.role === 'tech') : [];
     }
 
     function saveRegisteredUsers(broadcastChange = true) {
       try {
-        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(registeredUsers));
+        // Nunca salva contas de Suporte Técnico (role === 'tech') no localStorage para que cada acesso de suporte seja 100% novo e diferente
+        const onlyClientsToPersist = registeredUsers.filter(u => u && u.role !== 'tech');
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(onlyClientsToPersist));
       } catch (e) {}
       if (broadcastChange) {
         broadcastFullState();
@@ -2595,7 +2609,7 @@
 
       // 3. Storage listener local + Verificador periódico contínuo (garante sincronia mesmo em janelas blob/file)
       window.addEventListener('storage', (ev) => {
-        if (ev.key === 'helptop_sync_packet_v3' && ev.newValue) {
+        if (ev.key === 'helptop_sync_packet_v4' && ev.newValue) {
           try {
             const data = JSON.parse(ev.newValue);
             if (data && data.senderId !== clientInstanceId) {
@@ -2607,7 +2621,7 @@
 
       setInterval(() => {
         try {
-          const rawPacket = localStorage.getItem('helptop_sync_packet_v3');
+          const rawPacket = localStorage.getItem('helptop_sync_packet_v4');
           if (rawPacket) {
             const parsed = JSON.parse(rawPacket);
             if (parsed && parsed.senderId !== clientInstanceId && parsed.timestamp > lastKnownSyncTimestamp) {
@@ -2677,13 +2691,14 @@
         type: 'HELPTOP_SYNC_STATE',
         senderId: clientInstanceId,
         timestamp: nowTs,
-        users: registeredUsers,
+        // Nunca sincroniza nem salva contas de Suporte Técnico entre acessos diferentes
+        users: registeredUsers.filter(u => u && u.role !== 'tech'),
         tickets: supportTickets,
         eventMeta: eventMeta
       };
 
       try {
-        localStorage.setItem('helptop_sync_packet_v3', JSON.stringify(packet));
+        localStorage.setItem('helptop_sync_packet_v4', JSON.stringify(packet));
       } catch (e) {}
 
       try {
@@ -2746,30 +2761,31 @@
           localStorage.removeItem(TICKETS_STORAGE_KEY);
         } catch (e) {}
       } else {
-        // Mescla inteligente de usuários entre dispositivos diferentes (PC + Celular 4G) sem apagar cadastros existentes
+        // Mescla inteligente de usuários (somente Clientes; Suporte Técnico nunca fica salvo entre acessos)
         if (Array.isArray(packet.users)) {
+          const currentSessionTechs = registeredUsers.filter(u => u && u.role === 'tech');
           if (meta && meta.action === 'DELETE_USER') {
-            registeredUsers = packet.users;
+            registeredUsers = [...packet.users.filter(u => u && u.role !== 'tech'), ...currentSessionTechs];
           } else {
-            const mergedUsers = [...registeredUsers];
+            const mergedClients = registeredUsers.filter(u => u && u.role !== 'tech');
             packet.users.forEach(incUser => {
-              if (!incUser || (!incUser.username && !incUser.email)) return;
-              const idx = mergedUsers.findIndex(u =>
+              if (!incUser || incUser.role === 'tech' || (!incUser.username && !incUser.email)) return;
+              const idx = mergedClients.findIndex(u =>
                 u.role === incUser.role && (
                   (incUser.username && u.username && u.username.toLowerCase() === incUser.username.toLowerCase()) ||
                   (incUser.email && u.email && u.email.toLowerCase() === incUser.email.toLowerCase())
                 )
               );
               if (idx >= 0) {
-                mergedUsers[idx] = incUser;
+                mergedClients[idx] = incUser;
               } else {
-                mergedUsers.push(incUser);
+                mergedClients.push(incUser);
               }
             });
-            registeredUsers = mergedUsers;
+            registeredUsers = [...mergedClients, ...currentSessionTechs];
           }
           try {
-            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(registeredUsers));
+            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(registeredUsers.filter(u => u && u.role !== 'tech')));
           } catch (e) {}
         }
 
@@ -4630,32 +4646,34 @@
         device: role === 'client' ? deviceVal : specVal
       };
 
-      const existingIndex = registeredUsers.findIndex(u =>
-        u.role === role && (
-          (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
-          (email && u.email && u.email.toLowerCase() === email.toLowerCase())
-        )
-      );
-      if (existingIndex >= 0) {
-        registeredUsers[existingIndex] = newUser;
-      } else {
+      if (role === 'tech') {
+        // No Suporte Técnico, cada novo cadastro substitui qualquer técnico anterior em memória para que cada acesso seja 100% único
+        registeredUsers = registeredUsers.filter(u => u && u.role !== 'tech');
         registeredUsers.push(newUser);
+      } else {
+        const existingIndex = registeredUsers.findIndex(u =>
+          u.role === role && (
+            (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
+            (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+          )
+        );
+        if (existingIndex >= 0) {
+          registeredUsers[existingIndex] = newUser;
+        } else {
+          registeredUsers.push(newUser);
+        }
       }
 
       saveRegisteredUsers(true);
       clearRegisterForm();
 
       const msg = role === 'tech'
-        ? `Cadastro de Suporte "${name}" concluído! Entre abaixo com seu usuário (${username}), senha e credencial (${validatedTechCode}).`
+        ? `Cadastro de Suporte "${name}" concluído! Digite seu usuário (${username}), senha e credencial (${validatedTechCode}) para iniciar este acesso.`
         : `Cadastro de "${name}" concluído com sucesso! Entre abaixo com seu usuário (${username}) e senha.`;
 
       openLoginScreen(msg);
       document.getElementById('login-role').value = role;
-      document.getElementById('login-email').value = username;
       toggleLoginTechCode();
-      if (role === 'tech') {
-        document.getElementById('login-tech-code').value = validatedTechCode;
-      }
     }
 
     function handleLoginSubmit(e) {
@@ -4711,11 +4729,15 @@
           agentNameEl.innerText = `${userObj.name} • ${userObj.device || 'Suporte Técnico'} (${userObj.techCode || 'Credenciado'})`;
         }
         supportTickets = loadSupportTickets();
-        renderTechSupportQueue();
+        const waitingTicket = supportTickets.find(t => t.status !== 'Resolvido') || supportTickets[0];
+        if (waitingTicket) {
+          selectTechTicket(waitingTicket.protocol);
+        } else {
+          renderTechSupportQueue();
+        }
         goToScreen('tech-panel');
 
-        // Se o cliente abriu um chamado ANTES de o técnico existir ou fazer login, dispara o Pop-up de Chamado assim que o técnico entra!
-        const waitingTicket = supportTickets.find(t => t.status !== 'Resolvido' && !t.assignedTech) || supportTickets[0];
+        // Dispara o Pop-up de Chamado para o técnico deste novo acesso
         if (waitingTicket) {
           const lastMsgObj = waitingTicket.messages && waitingTicket.messages.length > 0
             ? waitingTicket.messages[waitingTicket.messages.length - 1]
@@ -4765,8 +4787,36 @@
     }
 
     function logoutMobileUser() {
+      const wasTech = demoState.user && demoState.user.role === 'tech';
+      const oldTechName = wasTech ? demoState.user.name : null;
       demoState.isAuthenticated = false;
       demoState.user = null;
+
+      if (wasTech) {
+        // Remove o técnico e a credencial ao sair para que o próximo acesso de Suporte seja totalmente diferente e do zero
+        registeredUsers = registeredUsers.filter(u => u && u.role !== 'tech');
+        lastGeneratedTechCredential = "";
+        lastCredentialMessageData = null;
+        closeTopCredentialBanner();
+        try {
+          const clip = localStorage.getItem('helptop_clipboard_memory');
+          if (clip && /SUP-/i.test(clip)) localStorage.removeItem('helptop_clipboard_memory');
+        } catch (e) {}
+
+        // Libera o vínculo do técnico anterior nos chamados abertos para que o próximo suporte assuma com o novo nome
+        supportTickets = loadSupportTickets();
+        let changedTicket = false;
+        supportTickets.forEach(t => {
+          if (t && t.status !== 'Resolvido' && (!oldTechName || t.assignedTech === oldTechName)) {
+            t.assignedTech = null;
+            changedTicket = true;
+          }
+        });
+        if (changedTicket) {
+          saveSupportTickets(true);
+        }
+      }
+
       resetBotConversationContext();
       clearLoginForm();
       clearRegisterForm();
@@ -6464,13 +6514,16 @@
       activeTechTicketProtocol = protocolCode;
       supportTickets = loadSupportTickets();
       const ticket = supportTickets.find(t => t.protocol === protocolCode);
-      if (ticket && demoState.user && demoState.user.role === 'tech' && !ticket.assignedTech) {
+      // Sempre atualiza para o técnico do acesso atual (mesmo que outro suporte tenha atendido antes!)
+      if (ticket && demoState.user && demoState.user.role === 'tech' && ticket.assignedTech !== demoState.user.name) {
         ticket.assignedTech = demoState.user.name;
-        ticket.status = "Em Atendimento";
+        if (ticket.status === 'Aberto') {
+          ticket.status = "Em Atendimento";
+        }
         ticket.messages.push({
           senderRole: 'system',
           senderName: demoState.user.name,
-          text: `👨‍💻 O técnico <strong>${demoState.user.name}</strong> assumiu o chamado e está conectado em tempo real.`
+          text: `👨‍💻 O técnico <strong>${demoState.user.name}</strong> (${demoState.user.techCode || 'Suporte'}) assumiu o chamado neste acesso e está conectado em tempo real.`
         });
         saveSupportTickets(false);
         broadcastFullState({

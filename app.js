@@ -21,9 +21,9 @@ import {
 // ============================================================================
 // CONSTANTES DE ARMAZENAMENTO E SINCRONIZAÇÃO EM TEMPO REAL
 // ============================================================================
-const USERS_STORAGE_KEY = 'helptop_users_zero_v3';
-const TICKETS_STORAGE_KEY = 'helptop_tickets_zero_v3';
-const SYNC_PACKET_KEY = 'helptop_sync_packet_v3';
+const USERS_STORAGE_KEY = 'helptop_users_zero_v4';
+const TICKETS_STORAGE_KEY = 'helptop_tickets_zero_v4';
+const SYNC_PACKET_KEY = 'helptop_sync_packet_v4';
 
 // Armazenamento universal compatível com React Native puro (memória + ExpoFileSystem) e Expo Web (localStorage)
 const memoryStore = {};
@@ -1149,28 +1149,30 @@ export default function App() {
       return;
     }
 
-    // 1. Mescla inteligente de usuários entre dispositivos (Celular + PC)
+    // 1. Mescla inteligente de usuários (somente Clientes; Suporte Técnico nunca fica salvo entre acessos)
     if (Array.isArray(packet.users)) {
-      let nextUsers = [...registeredUsersRef.current];
+      const currentSessionTechs = registeredUsersRef.current.filter(u => u && u.role === 'tech');
+      let nextClients = registeredUsersRef.current.filter(u => u && u.role !== 'tech');
       if (meta && meta.action === 'DELETE_USER') {
-        nextUsers = packet.users;
+        nextClients = packet.users.filter(u => u && u.role !== 'tech');
       } else {
         packet.users.forEach(incUser => {
-          if (!incUser || (!incUser.username && !incUser.email)) return;
-          const idx = nextUsers.findIndex(
+          if (!incUser || incUser.role === 'tech' || (!incUser.username && !incUser.email)) return;
+          const idx = nextClients.findIndex(
             u =>
               u.role === incUser.role && (
                 (incUser.username && u.username && u.username.toLowerCase() === incUser.username.toLowerCase()) ||
                 (incUser.email && u.email && u.email.toLowerCase() === incUser.email.toLowerCase())
               )
           );
-          if (idx >= 0) nextUsers[idx] = incUser;
-          else nextUsers.push(incUser);
+          if (idx >= 0) nextClients[idx] = incUser;
+          else nextClients.push(incUser);
         });
       }
+      const nextUsers = [...nextClients, ...currentSessionTechs];
       registeredUsersRef.current = nextUsers;
       setRegisteredUsers(nextUsers);
-      UniversalStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
+      UniversalStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextClients));
     }
 
     // 2. Mescla inteligente de chamados e mensagens em tempo real
@@ -1287,14 +1289,22 @@ export default function App() {
       rafId = requestAnimationFrame(loop);
     }
 
-    // Carrega dados salvos e inicia telemetria real do dispositivo
+    // Carrega dados salvos (limpa chaves antigas e nunca carrega Suporte Técnico salvo de acessos anteriores)
     try {
+      UniversalStorage.removeItem('helptop_users_zero_v3');
+      UniversalStorage.removeItem('helptop_tickets_zero_v3');
+      UniversalStorage.removeItem('helptop_sync_packet_v3');
+      const clipOld = UniversalStorage.getItem('helptop_clipboard_memory');
+      if (clipOld && /SUP-/i.test(clipOld)) {
+        UniversalStorage.removeItem('helptop_clipboard_memory');
+      }
       const savedUsers = UniversalStorage.getItem(USERS_STORAGE_KEY);
       if (savedUsers) {
         const parsedU = JSON.parse(savedUsers);
         if (Array.isArray(parsedU)) {
-          registeredUsersRef.current = parsedU;
-          setRegisteredUsers(parsedU);
+          const onlyClients = parsedU.filter(u => u && u.role !== 'tech');
+          registeredUsersRef.current = onlyClients;
+          setRegisteredUsers(onlyClients);
         }
       }
       const savedTickets = UniversalStorage.getItem(TICKETS_STORAGE_KEY);
@@ -1320,7 +1330,7 @@ export default function App() {
     // CONEXÃO EM TEMPO REAL AUTOMÁTICA EM SEGUNDO PLANO (SEM PRECISAR DE BOTÃO)
     // 1. BroadcastChannel entre abas
     // ========================================================================
-    const MQTT_TOPIC_SYNC = 'helptop_mvp_2026/realtime_zero_v3';
+    const MQTT_TOPIC_SYNC = 'helptop_mvp_2026/realtime_zero_v4';
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('helptop_zero_sync_v3');
@@ -1588,7 +1598,9 @@ export default function App() {
     if (Array.isArray(nextUsers)) {
       registeredUsersRef.current = nextUsers;
       setRegisteredUsers(nextUsers);
-      UniversalStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
+      // Nunca persiste Suporte Técnico (role === 'tech') no storage para que cada acesso seja único e do zero
+      const onlyClients = nextUsers.filter(u => u && u.role !== 'tech');
+      UniversalStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(onlyClients));
     }
     if (Array.isArray(nextTickets)) {
       supportTicketsRef.current = nextTickets;
@@ -1602,7 +1614,7 @@ export default function App() {
       type: 'HELPTOP_SYNC_STATE',
       senderId: clientInstanceIdRef.current,
       timestamp: nowTs,
-      users: resolvedUsers,
+      users: resolvedUsers.filter(u => u && u.role !== 'tech'),
       tickets: resolvedTickets,
       eventMeta
     };
@@ -1894,31 +1906,33 @@ export default function App() {
       device: regRole === 'client' ? deviceVal : specVal
     };
 
-    const nextUsers = [...registeredUsers];
-    const existingIdx = nextUsers.findIndex(
-      u =>
-        u.role === regRole && (
-          (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
-          (email && u.email && u.email.toLowerCase() === email.toLowerCase())
-        )
-    );
-    if (existingIdx >= 0) {
-      nextUsers[existingIdx] = newUser;
-    } else {
+    let nextUsers = [...registeredUsers];
+    if (regRole === 'tech') {
+      // No Suporte Técnico, cada novo cadastro substitui qualquer técnico anterior em memória para que cada acesso seja 100% diferente
+      nextUsers = nextUsers.filter(u => u && u.role !== 'tech');
       nextUsers.push(newUser);
+    } else {
+      const existingIdx = nextUsers.findIndex(
+        u =>
+          u.role === regRole && (
+            (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
+            (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+          )
+      );
+      if (existingIdx >= 0) {
+        nextUsers[existingIdx] = newUser;
+      } else {
+        nextUsers.push(newUser);
+      }
     }
 
     persistUsersAndTickets(nextUsers, null);
     const msg = regRole === 'tech'
-      ? `Cadastro de Suporte "${name}" concluído! Entre abaixo com seu usuário (${username}), senha e credencial (${validatedTechCode}).`
+      ? `Cadastro de Suporte "${name}" concluído! Digite seu usuário (${username}), senha e credencial (${validatedTechCode}) para iniciar este acesso.`
       : `Cadastro de "${name}" concluído com sucesso! Entre abaixo com seu usuário (${username}) e senha.`;
 
     openLoginScreen(msg);
     setLoginRole(regRole);
-    setLoginEmail(username);
-    if (regRole === 'tech') {
-      setLoginTechCode(validatedTechCode);
-    }
   }
 
   function handleLoginSubmit() {
@@ -1969,9 +1983,32 @@ export default function App() {
 
     if (userObj.role === 'tech') {
       setCurrentScreen('tech-panel');
-      const waitingTicket = supportTickets.find(t => t.status !== 'Resolvido' && !t.assignedTech) || supportTickets[0];
+      const waitingTicket = supportTickets.find(t => t.status !== 'Resolvido') || supportTickets[0];
       if (waitingTicket) {
         setActiveTechTicketProtocol(waitingTicket.protocol);
+        if (waitingTicket.assignedTech !== userObj.name) {
+          const nextTickets = supportTickets.map(t => {
+            if (t.protocol !== waitingTicket.protocol) return t;
+            return {
+              ...t,
+              assignedTech: userObj.name,
+              status: t.status === 'Aberto' ? 'Em Atendimento' : t.status,
+              messages: [
+                ...(t.messages || []),
+                {
+                  senderRole: 'system',
+                  senderName: userObj.name,
+                  text: `👨‍💻 O técnico ${userObj.name} (${userObj.techCode || 'Suporte'}) assumiu o chamado neste acesso e está conectado em tempo real.`
+                }
+              ]
+            };
+          });
+          persistUsersAndTickets(null, nextTickets, {
+            action: 'TECH_ACCEPTED',
+            protocol: waitingTicket.protocol,
+            previewText: `O técnico ${userObj.name} assumiu seu chamado ${waitingTicket.protocol}.`
+          });
+        }
         const lastMsg = waitingTicket.messages && waitingTicket.messages.length > 0
           ? waitingTicket.messages[waitingTicket.messages.length - 1]
           : null;
@@ -2004,8 +2041,37 @@ export default function App() {
   }
 
   function logoutMobileUser() {
+    const wasTech = currentUser && currentUser.role === 'tech';
+    const oldTechName = wasTech ? currentUser.name : null;
     setIsAuthenticated(false);
     setCurrentUser(null);
+
+    if (wasTech) {
+      // Remove o técnico e a credencial ao sair para que cada acesso de Suporte seja totalmente diferente e do zero
+      const onlyClients = registeredUsers.filter(u => u && u.role !== 'tech');
+      registeredUsersRef.current = onlyClients;
+      setRegisteredUsers(onlyClients);
+      setLastGeneratedTechCredential('');
+      setCredentialMessageData(null);
+      setShowTopCredentialBanner(false);
+      const clip = UniversalStorage.getItem('helptop_clipboard_memory');
+      if (clip && /SUP-/i.test(clip)) {
+        UniversalStorage.removeItem('helptop_clipboard_memory');
+      }
+
+      let changedTicket = false;
+      const nextTickets = supportTickets.map(t => {
+        if (t && t.status !== 'Resolvido' && (!oldTechName || t.assignedTech === oldTechName)) {
+          changedTicket = true;
+          return { ...t, assignedTech: null };
+        }
+        return t;
+      });
+      if (changedTicket) {
+        persistUsersAndTickets(onlyClients, nextTickets);
+      }
+    }
+
     resetBotConversationContext();
     setCurrentScreen('welcome');
   }
@@ -3048,19 +3114,19 @@ export default function App() {
   function selectTechTicket(protocolCode) {
     setActiveTechTicketProtocol(protocolCode);
     const target = supportTickets.find(t => t.protocol === protocolCode);
-    if (target && currentUser && currentUser.role === 'tech' && !target.assignedTech) {
+    if (target && currentUser && currentUser.role === 'tech' && target.assignedTech !== currentUser.name) {
       const nextTickets = supportTickets.map(t => {
         if (t.protocol !== protocolCode) return t;
         return {
           ...t,
           assignedTech: currentUser.name,
-          status: 'Em Atendimento',
+          status: t.status === 'Aberto' ? 'Em Atendimento' : t.status,
           messages: [
             ...(t.messages || []),
             {
               senderRole: 'system',
               senderName: currentUser.name,
-              text: `👨‍💻 O técnico ${currentUser.name} assumiu o chamado e está conectado em tempo real.`
+              text: `👨‍💻 O técnico ${currentUser.name} (${currentUser.techCode || 'Suporte'}) assumiu o chamado neste acesso e está conectado em tempo real.`
             }
           ]
         };
