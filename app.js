@@ -960,6 +960,7 @@ export default function App() {
   // Formulário de Cadastro
   const [regRole, setRegRole] = useState('client');
   const [regName, setRegName] = useState('');
+  const [regUsername, setRegUsername] = useState('');
   const [regCpf, setRegCpf] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regEmail, setRegEmail] = useState('');
@@ -976,6 +977,7 @@ export default function App() {
 
   // Formulário de Perfil e Configurações
   const [profName, setProfName] = useState('');
+  const [profUsername, setProfUsername] = useState('');
   const [profCpf, setProfCpf] = useState('');
   const [profPhone, setProfPhone] = useState('');
   const [profEmail, setProfEmail] = useState('');
@@ -1154,9 +1156,13 @@ export default function App() {
         nextUsers = packet.users;
       } else {
         packet.users.forEach(incUser => {
-          if (!incUser || !incUser.email) return;
+          if (!incUser || (!incUser.username && !incUser.email)) return;
           const idx = nextUsers.findIndex(
-            u => u.email.toLowerCase() === incUser.email.toLowerCase() && u.role === incUser.role
+            u =>
+              u.role === incUser.role && (
+                (incUser.username && u.username && u.username.toLowerCase() === incUser.username.toLowerCase()) ||
+                (incUser.email && u.email && u.email.toLowerCase() === incUser.email.toLowerCase())
+              )
           );
           if (idx >= 0) nextUsers[idx] = incUser;
           else nextUsers.push(incUser);
@@ -1716,6 +1722,7 @@ export default function App() {
   function openRegisterScreen() {
     setRegRole('client');
     setRegName('');
+    setRegUsername('');
     setRegCpf('');
     setRegPhone('');
     setRegEmail('');
@@ -1785,19 +1792,28 @@ export default function App() {
   }
 
   function resendLoginTechCredential(channel) {
-    const email = loginEmail.trim().toLowerCase();
-    if (!email || !email.includes('@')) {
-      setLoginFeedback({ text: 'Digite seu e-mail cadastrado primeiro para localizarmos sua credencial de suporte.', isError: true });
+    const loginInput = loginEmail.trim().toLowerCase();
+    if (!loginInput) {
+      setLoginFeedback({ text: 'Digite seu usuário cadastrado primeiro para localizarmos sua credencial de suporte.', isError: true });
       return;
     }
-    const foundTech = registeredUsers.find(u => u.email.toLowerCase() === email && u.role === 'tech');
+    const foundTech = registeredUsers.find(
+      u =>
+        u.role === 'tech' && (
+          (u.username && u.username.toLowerCase() === loginInput) ||
+          (u.email && u.email.toLowerCase() === loginInput) ||
+          (u.name && u.name.toLowerCase() === loginInput)
+        )
+    );
     if (!foundTech) {
-      setLoginFeedback({ text: 'Nenhum cadastro de Suporte Técnico encontrado para este e-mail. Crie sua conta primeiro.', isError: true });
+      setLoginFeedback({ text: 'Nenhum cadastro de Suporte Técnico encontrado para este usuário. Crie sua conta primeiro.', isError: true });
       return;
     }
     const codeToUse = foundTech.techCode || lastGeneratedTechCredential || `SUP-${Math.floor(1000 + Math.random() * 9000)}`;
     setLastGeneratedTechCredential(codeToUse);
-    const destination = channel === 'sms' ? (foundTech.phone || email) : email;
+    const destination = channel === 'sms'
+      ? (foundTech.phone || foundTech.username || loginInput)
+      : (foundTech.email || foundTech.username || loginInput);
     const channelLabel = channel === 'sms' ? 'SMS' : 'E-MAIL';
 
     setCredentialMessageData({
@@ -1814,6 +1830,7 @@ export default function App() {
 
   function handleRegisterSubmit() {
     const name = regName.trim();
+    const username = regUsername.trim();
     const cpf = regCpf.trim();
     const phone = regPhone.trim();
     const email = regEmail.trim().toLowerCase();
@@ -1822,12 +1839,12 @@ export default function App() {
       setRegFeedback({ text: 'Informe seu nome completo.', isError: true });
       return;
     }
-    if (cpf.length < 11) {
-      setRegFeedback({ text: 'Informe um CPF válido.', isError: true });
+    if (username.length < 3) {
+      setRegFeedback({ text: 'Informe um usuário de acesso (mínimo 3 caracteres).', isError: true });
       return;
     }
-    if (!email.includes('@')) {
-      setRegFeedback({ text: 'Informe um e-mail válido.', isError: true });
+    if (cpf.length < 11) {
+      setRegFeedback({ text: 'Informe um CPF válido.', isError: true });
       return;
     }
     if (regPass.length < 6) {
@@ -1867,6 +1884,7 @@ export default function App() {
 
     const newUser = {
       name,
+      username,
       email,
       cpf,
       phone,
@@ -1877,7 +1895,13 @@ export default function App() {
     };
 
     const nextUsers = [...registeredUsers];
-    const existingIdx = nextUsers.findIndex(u => u.email.toLowerCase() === email && u.role === regRole);
+    const existingIdx = nextUsers.findIndex(
+      u =>
+        u.role === regRole && (
+          (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
+          (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+        )
+    );
     if (existingIdx >= 0) {
       nextUsers[existingIdx] = newUser;
     } else {
@@ -1886,28 +1910,39 @@ export default function App() {
 
     persistUsersAndTickets(nextUsers, null);
     const msg = regRole === 'tech'
-      ? `Cadastro de Suporte "${name}" concluído! Entre abaixo com seu e-mail, senha e credencial (${validatedTechCode}).`
-      : `Cadastro de "${name}" concluído com sucesso! Faça seu login abaixo para entrar.`;
+      ? `Cadastro de Suporte "${name}" concluído! Entre abaixo com seu usuário (${username}), senha e credencial (${validatedTechCode}).`
+      : `Cadastro de "${name}" concluído com sucesso! Entre abaixo com seu usuário (${username}) e senha.`;
 
     openLoginScreen(msg);
     setLoginRole(regRole);
+    setLoginEmail(username);
     if (regRole === 'tech') {
       setLoginTechCode(validatedTechCode);
     }
   }
 
   function handleLoginSubmit() {
-    const email = loginEmail.trim().toLowerCase();
+    const loginUser = loginEmail.trim().toLowerCase();
+    if (!loginUser) {
+      setLoginFeedback({ text: 'Digite seu usuário cadastrado para acessar.', isError: true });
+      return;
+    }
     if (loginPassTooShort()) {
       setLoginFeedback({ text: 'A senha deve ter no mínimo 6 dígitos.', isError: true });
       return;
     }
     const found = registeredUsers.find(
-      u => u.email.toLowerCase() === email && u.pass === loginPassword && u.role === loginRole
+      u =>
+        u.role === loginRole &&
+        u.pass === loginPassword && (
+          (u.username && u.username.toLowerCase() === loginUser) ||
+          (u.email && u.email.toLowerCase() === loginUser) ||
+          (u.name && u.name.toLowerCase() === loginUser)
+        )
     );
     if (!found) {
       setLoginFeedback({
-        text: "Nenhuma conta encontrada com esses dados. Toque em 'Criar conta agora' abaixo para se cadastrar do zero.",
+        text: "Nenhuma conta encontrada com esse usuário e senha. Toque em 'Criar conta agora' abaixo para se cadastrar.",
         isError: true
       });
       return;
@@ -1956,7 +1991,8 @@ export default function App() {
     }
 
     const myExistingTicket = supportTickets.find(
-      t => (t.clientEmail && t.clientEmail.toLowerCase() === userObj.email.toLowerCase()) ||
+      t => (userObj.username && t.clientUsername && t.clientUsername.toLowerCase() === userObj.username.toLowerCase()) ||
+           (userObj.email && t.clientEmail && t.clientEmail.toLowerCase() === userObj.email.toLowerCase()) ||
            (t.clientName && t.clientName.toLowerCase() === userObj.name.toLowerCase())
     );
     if (myExistingTicket) {
@@ -1977,6 +2013,7 @@ export default function App() {
   function openSettingsProfileScreen() {
     if (!isAuthenticated || !currentUser) return;
     setProfName(currentUser.name || '');
+    setProfUsername(currentUser.username || '');
     setProfCpf(currentUser.cpf || '');
     setProfPhone(currentUser.phone || '');
     setProfEmail(currentUser.email || '');
@@ -1993,11 +2030,13 @@ export default function App() {
 
   function handleSaveProfileSettings() {
     if (!currentUser) return;
-    const oldEmail = currentUser.email.toLowerCase();
+    const oldUsername = (currentUser.username || '').toLowerCase();
+    const oldEmail = (currentUser.email || '').toLowerCase();
     const role = currentUser.role;
     const updatedUser = {
       ...currentUser,
       name: profName.trim(),
+      username: profUsername.trim() || currentUser.username || '',
       cpf: profCpf.trim(),
       phone: profPhone.trim(),
       email: profEmail.trim().toLowerCase(),
@@ -2006,7 +2045,13 @@ export default function App() {
     };
     setCurrentUser(updatedUser);
     const nextUsers = [...registeredUsers];
-    const idx = nextUsers.findIndex(u => u.email.toLowerCase() === oldEmail && u.role === role);
+    const idx = nextUsers.findIndex(
+      u =>
+        u.role === role && (
+          (oldUsername && u.username && u.username.toLowerCase() === oldUsername) ||
+          (oldEmail && u.email && u.email.toLowerCase() === oldEmail)
+        )
+    );
     if (idx >= 0) nextUsers[idx] = updatedUser;
     else nextUsers.push(updatedUser);
     persistUsersAndTickets(nextUsers, null);
@@ -2016,9 +2061,17 @@ export default function App() {
 
   function confirmDeleteCurrentUserAccount() {
     if (!currentUser) return;
-    const emailToDel = currentUser.email.toLowerCase();
+    const usernameToDel = (currentUser.username || '').toLowerCase();
+    const emailToDel = (currentUser.email || '').toLowerCase();
     const roleToDel = currentUser.role;
-    const nextUsers = registeredUsers.filter(u => !(u.email.toLowerCase() === emailToDel && u.role === roleToDel));
+    const nextUsers = registeredUsers.filter(
+      u => !(
+        u.role === roleToDel && (
+          (usernameToDel && u.username && u.username.toLowerCase() === usernameToDel) ||
+          (emailToDel && u.email && u.email.toLowerCase() === emailToDel)
+        )
+      )
+    );
     persistUsersAndTickets(nextUsers, null, { action: 'DELETE_USER' });
     setShowDeleteAccountModal(false);
     logoutMobileUser();
@@ -2705,7 +2758,8 @@ export default function App() {
     setSupportInput('');
 
     const clientName = currentUser ? currentUser.name : 'Cliente';
-    const clientEmail = currentUser ? currentUser.email : '';
+    const clientUsername = currentUser ? (currentUser.username || '') : '';
+    const clientEmail = currentUser ? (currentUser.email || '') : '';
     const clientDevice = (currentUser && currentUser.device) ? currentUser.device : metrics.deviceName;
 
     if (!supportProtocolConnected) {
@@ -2728,6 +2782,7 @@ export default function App() {
         ticket = {
           protocol: code,
           clientName,
+          clientUsername,
           clientEmail,
           clientDevice,
           status: 'Aberto',
@@ -3221,7 +3276,7 @@ export default function App() {
         <ScrollView style={styles.flex1} contentContainerStyle={{ padding: 14 }}>
           <View style={styles.sectionHeaderBorder}>
             <Text style={styles.sectionTitle}>Acessar Conta Cadastrada</Text>
-            <Text style={styles.sectionSubtitle}>Entre com o e-mail e a senha que você cadastrou.</Text>
+            <Text style={styles.sectionSubtitle}>Entre com o usuário e a senha que você cadastrou.</Text>
           </View>
 
           {loginFeedback && (
@@ -3252,11 +3307,11 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.inputLabel}>E-mail:</Text>
+          <Text style={styles.inputLabel}>Usuário:</Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Digite seu e-mail cadastrado..."
-            keyboardType="email-address"
+            placeholder="Digite seu usuário cadastrado..."
+            keyboardType="default"
             autoCapitalize="none"
             value={loginEmail}
             onChangeText={setLoginEmail}
@@ -3388,6 +3443,15 @@ export default function App() {
             onChangeText={setRegName}
           />
 
+          <Text style={styles.inputLabel}>Usuário (Login): *</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Crie seu usuário de acesso (ex: victor123)"
+            autoCapitalize="none"
+            value={regUsername}
+            onChangeText={setRegUsername}
+          />
+
           <View style={styles.rowGap8}>
             <View style={styles.flex1}>
               <Text style={styles.inputLabel}>CPF: *</Text>
@@ -3411,7 +3475,7 @@ export default function App() {
             </View>
           </View>
 
-          <Text style={styles.inputLabel}>E-mail: *</Text>
+          <Text style={styles.inputLabel}>E-mail (opcional / p/ credencial):</Text>
           <TextInput
             style={styles.textInput}
             placeholder="email@exemplo.com"
@@ -4782,7 +4846,9 @@ export default function App() {
               <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#111827' }}>
                 {u ? u.name : 'Usuário'}
               </Text>
-              <Text style={{ fontSize: 11, color: '#6b7280' }}>{u ? u.email : ''}</Text>
+              <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                {u ? (u.username ? `@${u.username}${u.email ? ' • ' + u.email : ''}` : (u.email || '')) : ''}
+              </Text>
               <View style={styles.rolePillClient}>
                 <Text style={styles.rolePillClientText}>
                   {u && u.role === 'tech' ? 'Suporte Técnico Credenciado' : 'Cliente / Usuário'}
@@ -4808,6 +4874,14 @@ export default function App() {
             <Text style={styles.inputLabel}>Nome Completo:</Text>
             <TextInput style={styles.textInput} value={profName} onChangeText={setProfName} />
 
+            <Text style={styles.inputLabel}>Usuário de Acesso (Login):</Text>
+            <TextInput
+              style={styles.textInput}
+              autoCapitalize="none"
+              value={profUsername}
+              onChangeText={setProfUsername}
+            />
+
             <View style={styles.rowGap8}>
               <View style={styles.flex1}>
                 <Text style={styles.inputLabel}>CPF Cadastrado:</Text>
@@ -4819,7 +4893,7 @@ export default function App() {
               </View>
             </View>
 
-            <Text style={styles.inputLabel}>E-mail de Acesso:</Text>
+            <Text style={styles.inputLabel}>E-mail Cadastrado:</Text>
             <TextInput
               style={styles.textInput}
               autoCapitalize="none"
@@ -5477,7 +5551,7 @@ export default function App() {
             </Text>
             <View style={[styles.feedbackBox, styles.feedbackError, { marginTop: 8 }]}>
               <Text style={styles.feedbackErrorText}>
-                {currentUser ? `${currentUser.name} (${currentUser.email})` : ''}
+                {currentUser ? `${currentUser.name} (${currentUser.username ? '@' + currentUser.username : currentUser.email})` : ''}
               </Text>
             </View>
             <View style={[styles.rowGap6, { marginTop: 10 }]}>

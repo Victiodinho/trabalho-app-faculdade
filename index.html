@@ -222,7 +222,7 @@
           <div>
             <div class="mb-3 pb-2 border-b border-gray-200">
               <h2 class="text-sm font-bold text-gray-800">Acessar Conta Cadastrada</h2>
-              <p class="text-[11px] text-gray-500">Entre com o e-mail e a senha que você cadastrou.</p>
+              <p class="text-[11px] text-gray-500">Entre com o usuário e a senha que você cadastrou.</p>
             </div>
 
             <!-- Caixa de aviso (erro ou sucesso após cadastro) -->
@@ -238,8 +238,8 @@
               </div>
 
               <div>
-                <label class="block font-bold text-gray-700 mb-1">E-mail:</label>
-                <input id="login-email" type="email" placeholder="Digite seu e-mail cadastrado..." required class="w-full border border-gray-300 rounded px-2.5 py-2 text-gray-800">
+                <label class="block font-bold text-gray-700 mb-1">Usuário:</label>
+                <input id="login-email" type="text" placeholder="Digite seu usuário cadastrado..." required class="w-full border border-gray-300 rounded px-2.5 py-2 text-gray-800">
               </div>
 
               <div>
@@ -347,6 +347,11 @@
               <input id="reg-name" type="text" placeholder="Digite o nome completo" required class="w-full border border-gray-300 rounded px-2.5 py-1.5 text-gray-800">
             </div>
 
+            <div>
+              <label class="block font-bold text-gray-700 mb-1">Usuário (Login): *</label>
+              <input id="reg-username" type="text" placeholder="Crie seu usuário de acesso (ex: victor123)" required class="w-full border border-gray-300 rounded px-2.5 py-1.5 text-gray-800">
+            </div>
+
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block font-bold text-gray-700 mb-1">CPF: *</label>
@@ -359,8 +364,8 @@
             </div>
 
             <div>
-              <label class="block font-bold text-gray-700 mb-1">E-mail: *</label>
-              <input id="reg-email" type="email" placeholder="email@exemplo.com" required class="w-full border border-gray-300 rounded px-2.5 py-1.5 text-gray-800">
+              <label class="block font-bold text-gray-700 mb-1">E-mail (opcional / p/ credencial):</label>
+              <input id="reg-email" type="email" placeholder="email@exemplo.com" class="w-full border border-gray-300 rounded px-2.5 py-1.5 text-gray-800">
             </div>
 
             <!-- Campo específico se for Cliente (Auto-detecta Aparelho ou PC Real) -->
@@ -1217,6 +1222,11 @@
               <input id="prof-name" type="text" required class="w-full border border-gray-300 rounded px-2 py-1.5 text-gray-800">
             </div>
 
+            <div>
+              <label class="block font-bold text-gray-700 mb-0.5">Usuário de Acesso (Login):</label>
+              <input id="prof-username" type="text" required class="w-full border border-gray-300 rounded px-2 py-1.5 text-gray-800">
+            </div>
+
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block font-bold text-gray-700 mb-0.5">CPF Cadastrado:</label>
@@ -1229,8 +1239,8 @@
             </div>
 
             <div>
-              <label class="block font-bold text-gray-700 mb-0.5">E-mail de Acesso:</label>
-              <input id="prof-email" type="email" required class="w-full border border-gray-300 rounded px-2 py-1.5 text-gray-800">
+              <label class="block font-bold text-gray-700 mb-0.5">E-mail Cadastrado:</label>
+              <input id="prof-email" type="email" class="w-full border border-gray-300 rounded px-2 py-1.5 text-gray-800">
             </div>
 
             <!-- Campo se for Cliente -->
@@ -2719,8 +2729,13 @@
           } else {
             const mergedUsers = [...registeredUsers];
             packet.users.forEach(incUser => {
-              if (!incUser || !incUser.email) return;
-              const idx = mergedUsers.findIndex(u => u.email.toLowerCase() === incUser.email.toLowerCase() && u.role === incUser.role);
+              if (!incUser || (!incUser.username && !incUser.email)) return;
+              const idx = mergedUsers.findIndex(u =>
+                u.role === incUser.role && (
+                  (incUser.username && u.username && u.username.toLowerCase() === incUser.username.toLowerCase()) ||
+                  (incUser.email && u.email && u.email.toLowerCase() === incUser.email.toLowerCase())
+                )
+              );
               if (idx >= 0) {
                 mergedUsers[idx] = incUser;
               } else {
@@ -3826,7 +3841,7 @@
       const initials = u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'HT';
       document.getElementById('profile-avatar-circle').innerText = initials;
       document.getElementById('profile-header-name').innerText = u.name;
-      document.getElementById('profile-header-email').innerText = u.email;
+      document.getElementById('profile-header-email').innerText = u.username ? `@${u.username}${u.email ? ' • ' + u.email : ''}` : (u.email || '');
 
       const roleBadge = document.getElementById('profile-header-role-badge');
       const clientBox = document.getElementById('prof-client-box');
@@ -3848,6 +3863,8 @@
       }
 
       document.getElementById('prof-name').value = u.name || '';
+      const profUserEl = document.getElementById('prof-username');
+      if (profUserEl) profUserEl.value = u.username || '';
       document.getElementById('prof-cpf').value = u.cpf || '';
       document.getElementById('prof-phone').value = u.phone || '';
       document.getElementById('prof-email').value = u.email || '';
@@ -3870,10 +3887,15 @@
     function handleSaveProfileSettings(e) {
       e.preventDefault();
       if (!demoState.user) return;
-      const oldEmail = demoState.user.email.toLowerCase();
+      const oldUsername = (demoState.user.username || '').toLowerCase();
+      const oldEmail = (demoState.user.email || '').toLowerCase();
       const role = demoState.user.role;
 
       demoState.user.name = document.getElementById('prof-name').value.trim();
+      const profUserEl = document.getElementById('prof-username');
+      if (profUserEl && profUserEl.value.trim()) {
+        demoState.user.username = profUserEl.value.trim();
+      }
       demoState.user.cpf = document.getElementById('prof-cpf').value.trim();
       demoState.user.phone = document.getElementById('prof-phone').value.trim();
       demoState.user.email = document.getElementById('prof-email').value.trim().toLowerCase();
@@ -3885,13 +3907,22 @@
         demoState.user.device = document.getElementById('prof-device').value.trim();
       }
 
-      const idx = registeredUsers.findIndex(u => u.email.toLowerCase() === oldEmail && u.role === role);
+      const idx = registeredUsers.findIndex(u =>
+        u.role === role && (
+          (oldUsername && u.username && u.username.toLowerCase() === oldUsername) ||
+          (oldEmail && u.email && u.email.toLowerCase() === oldEmail)
+        )
+      );
       if (idx >= 0) {
         registeredUsers[idx] = { ...demoState.user };
       } else {
         registeredUsers.push({ ...demoState.user });
       }
       saveRegisteredUsers(true);
+      document.getElementById('profile-header-name').innerText = demoState.user.name;
+      document.getElementById('profile-header-email').innerText = demoState.user.username
+        ? `@${demoState.user.username}${demoState.user.email ? ' • ' + demoState.user.email : ''}`
+        : (demoState.user.email || '');
 
       if (role === 'tech') {
         const agentNameEl = document.getElementById('tech-panel-agent-name');
@@ -3925,7 +3956,8 @@
     function openDeleteAccountModal() {
       if (!demoState.user) return;
       const lbl = document.getElementById('delete-account-user-label');
-      if (lbl) lbl.innerText = `${demoState.user.name} (${demoState.user.email})`;
+      const userIdLabel = demoState.user.username ? `@${demoState.user.username}` : demoState.user.email;
+      if (lbl) lbl.innerText = `${demoState.user.name} (${userIdLabel})`;
       document.getElementById('delete-account-modal').classList.remove('hidden');
     }
 
@@ -3935,9 +3967,15 @@
 
     function confirmDeleteCurrentUserAccount() {
       if (!demoState.user) return;
-      const emailToDel = demoState.user.email.toLowerCase();
+      const usernameToDel = (demoState.user.username || '').toLowerCase();
+      const emailToDel = (demoState.user.email || '').toLowerCase();
       const roleToDel = demoState.user.role;
-      registeredUsers = registeredUsers.filter(u => !(u.email.toLowerCase() === emailToDel && u.role === roleToDel));
+      registeredUsers = registeredUsers.filter(u => !(
+        u.role === roleToDel && (
+          (usernameToDel && u.username && u.username.toLowerCase() === usernameToDel) ||
+          (emailToDel && u.email && u.email.toLowerCase() === emailToDel)
+        )
+      ));
       saveRegisteredUsers(false);
       broadcastFullState({ action: 'DELETE_USER' });
       closeDeleteAccountModal();
@@ -4155,23 +4193,29 @@
 
     // Permite reenviar ou consultar a credencial na tela de Login caso o técnico tenha esquecido
     function resendLoginTechCredential(channel) {
-      const email = document.getElementById('login-email').value.trim().toLowerCase();
-      if (!email || !email.includes('@')) {
-        showFeedback('login-feedback-box', "Digite seu e-mail cadastrado primeiro para localizarmos sua credencial de suporte.");
+      const loginInput = document.getElementById('login-email').value.trim().toLowerCase();
+      if (!loginInput) {
+        showFeedback('login-feedback-box', "Digite seu usuário cadastrado primeiro para localizarmos sua credencial de suporte.");
         document.getElementById('login-email').focus();
         return;
       }
 
       registeredUsers = loadRegisteredUsers();
-      const foundTech = registeredUsers.find(u => u.email.toLowerCase() === email && u.role === 'tech');
+      const foundTech = registeredUsers.find(u =>
+        u.role === 'tech' && (
+          (u.username && u.username.toLowerCase() === loginInput) ||
+          (u.email && u.email.toLowerCase() === loginInput) ||
+          (u.name && u.name.toLowerCase() === loginInput)
+        )
+      );
       if (!foundTech) {
-        showFeedback('login-feedback-box', "Nenhum cadastro de Suporte Técnico encontrado para este e-mail. Crie sua conta primeiro.");
+        showFeedback('login-feedback-box', "Nenhum cadastro de Suporte Técnico encontrado para este usuário. Crie sua conta primeiro.");
         return;
       }
 
       const codeToUse = foundTech.techCode || lastGeneratedTechCredential || `SUP-${Math.floor(1000 + Math.random() * 9000)}`;
       lastGeneratedTechCredential = codeToUse;
-      const destination = channel === 'sms' ? (foundTech.phone || email) : email;
+      const destination = channel === 'sms' ? (foundTech.phone || foundTech.username || loginInput) : (foundTech.email || foundTech.username || loginInput);
       const channelLabel = channel === 'sms' ? 'SMS' : 'E-MAIL';
 
       lastCredentialMessageData = {
@@ -4268,6 +4312,8 @@
       if (form) form.reset();
       document.getElementById('reg-role').value = 'client';
       document.getElementById('reg-name').value = '';
+      const regUserEl = document.getElementById('reg-username');
+      if (regUserEl) regUserEl.value = '';
       document.getElementById('reg-cpf').value = '';
       document.getElementById('reg-phone').value = '';
       document.getElementById('reg-email').value = '';
@@ -4403,6 +4449,7 @@
       e.preventDefault();
       const role = document.getElementById('reg-role').value;
       const name = document.getElementById('reg-name').value.trim();
+      const username = (document.getElementById('reg-username')?.value || '').trim();
       const cpf = document.getElementById('reg-cpf').value.trim();
       const phone = document.getElementById('reg-phone').value.trim();
       const email = document.getElementById('reg-email').value.trim().toLowerCase();
@@ -4412,6 +4459,10 @@
 
       if (name.length < 3) {
         showFeedback('register-feedback-box', "Informe seu nome completo.");
+        return;
+      }
+      if (username.length < 3) {
+        showFeedback('register-feedback-box', "Informe um usuário de acesso (mínimo 3 caracteres).");
         return;
       }
       if (cpf.length < 11) {
@@ -4455,6 +4506,7 @@
 
       const newUser = {
         name: name,
+        username: username,
         email: email,
         cpf: cpf,
         phone: phone,
@@ -4464,7 +4516,12 @@
         device: role === 'client' ? deviceVal : specVal
       };
 
-      const existingIndex = registeredUsers.findIndex(u => u.email.toLowerCase() === email && u.role === role);
+      const existingIndex = registeredUsers.findIndex(u =>
+        u.role === role && (
+          (u.username && u.username.toLowerCase() === username.toLowerCase()) ||
+          (email && u.email && u.email.toLowerCase() === email.toLowerCase())
+        )
+      );
       if (existingIndex >= 0) {
         registeredUsers[existingIndex] = newUser;
       } else {
@@ -4475,11 +4532,12 @@
       clearRegisterForm();
 
       const msg = role === 'tech'
-        ? `Cadastro de Suporte "${name}" concluído! Entre abaixo com seu e-mail, senha e credencial (${validatedTechCode}).`
-        : `Cadastro de "${name}" concluído com sucesso! Faça seu login abaixo para entrar.`;
+        ? `Cadastro de Suporte "${name}" concluído! Entre abaixo com seu usuário (${username}), senha e credencial (${validatedTechCode}).`
+        : `Cadastro de "${name}" concluído com sucesso! Entre abaixo com seu usuário (${username}) e senha.`;
 
       openLoginScreen(msg);
       document.getElementById('login-role').value = role;
+      document.getElementById('login-email').value = username;
       toggleLoginTechCode();
       if (role === 'tech') {
         document.getElementById('login-tech-code').value = validatedTechCode;
@@ -4489,20 +4547,31 @@
     function handleLoginSubmit(e) {
       e.preventDefault();
       const role = document.getElementById('login-role').value;
-      const email = document.getElementById('login-email').value.trim().toLowerCase();
+      const loginUser = document.getElementById('login-email').value.trim().toLowerCase();
       const pass = document.getElementById('login-password').value;
       const techCode = document.getElementById('login-tech-code').value.trim().toUpperCase();
 
       registeredUsers = loadRegisteredUsers();
 
+      if (!loginUser) {
+        showFeedback('login-feedback-box', "Digite seu usuário cadastrado para acessar.");
+        return;
+      }
       if (pass.length < 6) {
         showFeedback('login-feedback-box', "A senha deve ter no mínimo 6 dígitos.");
         return;
       }
 
-      const found = registeredUsers.find(u => u.email.toLowerCase() === email && u.pass === pass && u.role === role);
+      const found = registeredUsers.find(u =>
+        u.role === role &&
+        u.pass === pass && (
+          (u.username && u.username.toLowerCase() === loginUser) ||
+          (u.email && u.email.toLowerCase() === loginUser) ||
+          (u.name && u.name.toLowerCase() === loginUser)
+        )
+      );
       if (!found) {
-        showFeedback('login-feedback-box', "Nenhuma conta encontrada com esses dados. Clique em 'Criar conta agora' abaixo para se cadastrar do zero.");
+        showFeedback('login-feedback-box', "Nenhuma conta encontrada com esse usuário e senha. Clique em 'Criar conta agora' abaixo para se cadastrar.");
         return;
       }
 
@@ -4558,7 +4627,8 @@
       // Recupera automaticamente qualquer chamado já aberto por este cliente
       supportTickets = loadSupportTickets();
       const myExistingTicket = supportTickets.find(
-        t => (t.clientEmail && t.clientEmail.toLowerCase() === userObj.email.toLowerCase()) ||
+        t => (userObj.username && t.clientUsername && t.clientUsername.toLowerCase() === userObj.username.toLowerCase()) ||
+             (userObj.email && t.clientEmail && t.clientEmail.toLowerCase() === userObj.email.toLowerCase()) ||
              (t.clientName && t.clientName.toLowerCase() === userObj.name.toLowerCase())
       );
       if (myExistingTicket) {
@@ -5710,7 +5780,8 @@
 
     function connectOrSendClientSupportMessage(rawText) {
       const clientName = demoState.user ? demoState.user.name : "Cliente";
-      const clientEmail = demoState.user ? demoState.user.email : "";
+      const clientUsername = demoState.user ? (demoState.user.username || "") : "";
+      const clientEmail = demoState.user ? (demoState.user.email || "") : "";
       const clientDevice = (demoState.user && demoState.user.device && !/Android Identificado/i.test(demoState.user.device))
         ? demoState.user.device
         : (realHardwareProfile.deviceName || "Dispositivo Real");
@@ -5751,6 +5822,7 @@
           ticket = {
             protocol: code,
             clientName: clientName,
+            clientUsername: clientUsername,
             clientEmail: clientEmail,
             clientDevice: clientDevice,
             status: 'Aberto',
