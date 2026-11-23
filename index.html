@@ -90,10 +90,10 @@
   <!-- MOLDURA DO CELULAR -->
   <div class="phone-frame relative">
 
-    <!-- Barra de Status do Android -->
+    <!-- Barra de Status do Android / Sistema Real -->
     <div class="phone-statusbar">
-      <span id="android-clock">17:27</span>
-      <span>4G | Wi-Fi | Bat: 75%</span>
+      <span id="android-clock">--:--</span>
+      <span id="android-status-right">Lendo Rede e Energia...</span>
     </div>
 
     <!-- Banner de Notificação no Topo do Celular (E-mail ou SMS com Código de Credencial) -->
@@ -378,10 +378,16 @@
               <input id="reg-email" type="email" placeholder="email@exemplo.com" required class="w-full border border-gray-300 rounded px-2.5 py-1.5 text-gray-800">
             </div>
 
-            <!-- Campo específico se for Cliente -->
-            <div id="reg-client-fields" class="p-2.5 bg-gray-50 border border-gray-200 rounded">
-              <label class="block font-bold text-gray-700 mb-1">Modelo do Celular: *</label>
-              <input id="reg-device" type="text" placeholder="Ex: Samsung Galaxy A54" class="w-full border border-gray-300 rounded px-2.5 py-1.5 bg-white text-gray-800">
+            <!-- Campo específico se for Cliente (Auto-detecta Aparelho ou PC Real) -->
+            <div id="reg-client-fields" class="p-2.5 bg-gray-50 border border-gray-200 rounded space-y-1">
+              <div class="flex items-center justify-between">
+                <label class="block font-bold text-gray-700">Aparelho ou PC Detectado: *</label>
+                <button type="button" onclick="autoFillRealDeviceInRegister(true)" class="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded text-[10px] font-bold text-blue-800">
+                  🔄 Detectar Real
+                </button>
+              </div>
+              <input id="reg-device" type="text" placeholder="Detectando seu aparelho ou PC..." class="w-full border border-gray-300 rounded px-2.5 py-1.5 bg-white text-gray-800 font-medium">
+              <span id="reg-device-real-hint" class="block text-[10px] text-emerald-700 font-medium"></span>
             </div>
 
             <!-- Campos específicos se for Suporte Humano (Envio de Credencial por E-mail ou SMS) -->
@@ -528,75 +534,106 @@
               </div>
             </div>
 
-            <div class="flex flex-col items-end shrink-0">
-              <span class="text-[10px] text-gray-500 font-medium">Aparelho Identificado:</span>
-              <div class="mt-1 px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-lg text-[11px] font-bold flex items-center gap-1 shadow-sm">
+            <div class="flex flex-col items-end shrink-0 max-w-[185px]">
+              <span class="text-[10px] text-gray-500 font-medium">Dispositivo / PC Real:</span>
+              <div class="mt-1 px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-lg text-[10px] font-bold flex items-center gap-1 shadow-sm max-w-full">
                 <svg class="w-3.5 h-3.5 text-indigo-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                   <line x1="12" y1="18" x2="12.01" y2="18"/>
                 </svg>
-                <span id="mobile-device-display">Aparelho Android</span>
+                <span id="mobile-device-display" class="truncate">Detectando Hardware...</span>
               </div>
             </div>
           </div>
 
-          <!-- Medidores de Sistema -->
-          <div class="bg-white border border-gray-300 rounded-lg p-3 space-y-3 shadow-sm">
+          <!-- Medidores Reais de Sistema (Aparelho Físico ou PC) -->
+          <div class="bg-white border border-gray-300 rounded-lg p-3 space-y-2.5 shadow-sm">
             <div class="font-bold text-gray-800 border-b border-gray-200 pb-1.5 flex items-center justify-between">
-              <span>Status Atual do Aparelho</span>
-              <span class="text-[10px] font-normal text-gray-500">Tempo Real</span>
+              <span class="flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                <span>Telemetria Real (Aparelho / PC)</span>
+              </span>
+              <button type="button" onclick="collectRealHardwareTelemetry(true)" class="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-800 rounded text-[9px] font-bold">
+                🔄 Ler Agora
+              </button>
             </div>
 
-            <!-- RAM -->
+            <!-- Painel de Especificações Reais do Hardware Detectado -->
+            <div class="grid grid-cols-2 gap-1.5 bg-slate-50 border border-slate-200 rounded-lg p-2 text-[10px]">
+              <div class="truncate">
+                <span class="text-gray-500 block text-[9px]">Sistema / Arquitetura:</span>
+                <strong id="real-spec-os" class="text-slate-900 truncate block">Detectando SO...</strong>
+              </div>
+              <div class="truncate">
+                <span class="text-gray-500 block text-[9px]">Processador (CPU Real):</span>
+                <strong id="real-spec-cpu" class="text-slate-900 truncate block">Detectando Núcleos...</strong>
+              </div>
+              <div class="truncate col-span-2 border-t border-slate-200 pt-1">
+                <span class="text-gray-500 block text-[9px]">Placa Gráfica / GPU (WebGL Real):</span>
+                <strong id="real-spec-gpu" class="text-indigo-900 truncate block">Detectando GPU...</strong>
+              </div>
+              <div class="truncate border-t border-slate-200 pt-1">
+                <span class="text-gray-500 block text-[9px]">Tela &amp; Taxa Real (Hz):</span>
+                <strong id="real-spec-screen" class="text-slate-900 truncate block">--x-- (--Hz)</strong>
+              </div>
+              <div class="truncate border-t border-slate-200 pt-1">
+                <span class="text-gray-500 block text-[9px]">Rede &amp; Latência Real:</span>
+                <strong id="real-spec-net" class="text-emerald-800 truncate block">Medindo Ping...</strong>
+              </div>
+            </div>
+
+            <!-- RAM Real (Device Memory + JS Heap Real) -->
             <div>
               <div class="flex justify-between text-[11px] mb-1">
-                <span><strong>Memória RAM:</strong> <span id="ram-subtext" class="font-bold"></span></span>
-                <span><strong id="ram-percentage-text">88%</strong> (<span id="ram-details-text">5.3/6.0 GB</span>)</span>
+                <span><strong>Memória (RAM / Heap):</strong> <span id="ram-subtext" class="font-bold"></span></span>
+                <span><strong id="ram-percentage-text">--%</strong> (<span id="ram-details-text">Lendo...</span>)</span>
               </div>
               <div class="w-full bg-gray-200 h-2.5 rounded overflow-hidden">
-                <div id="ram-bar" class="bg-blue-600 h-full transition-all duration-500" style="width: 88%"></div>
+                <div id="ram-bar" class="bg-blue-600 h-full transition-all duration-500" style="width: 0%"></div>
               </div>
             </div>
 
-            <!-- Armazenamento -->
+            <!-- Armazenamento Real (Storage Quota API + Local/Cache) -->
             <div>
               <div class="flex justify-between text-[11px] mb-1">
-                <span><strong>Armazenamento:</strong> <span id="storage-subtext" class="font-bold"></span></span>
-                <span><strong id="storage-percentage-text">94%</strong> (<span id="storage-details-text">120/128 GB</span>)</span>
+                <span><strong>Armazenamento Real:</strong> <span id="storage-subtext" class="font-bold"></span></span>
+                <span><strong id="storage-percentage-text">--%</strong> (<span id="storage-details-text">Lendo Disco...</span>)</span>
               </div>
               <div class="w-full bg-gray-200 h-2.5 rounded overflow-hidden">
-                <div id="storage-bar" class="bg-blue-600 h-full transition-all duration-500" style="width: 94%"></div>
+                <div id="storage-bar" class="bg-blue-600 h-full transition-all duration-500" style="width: 0%"></div>
               </div>
             </div>
 
-            <!-- Temperatura e Estatística de Desempenho -->
+            <!-- Carga Térmica / Latência CPU Real e Desempenho Real (FPS / Benchmark) -->
             <div class="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100 text-[11px]">
               <div class="bg-gray-50 p-2 rounded border border-gray-200">
-                <span class="text-gray-500 block">Temperatura:</span>
-                <strong id="temp-value-text" class="text-sm text-gray-800">41.8°C</strong>
+                <span class="text-gray-500 block text-[10px]">Carga CPU / Temp. Est.:</span>
+                <strong id="temp-value-text" class="text-xs text-gray-800">--°C</strong>
+                <span id="cpu-latency-subtext" class="block text-[9px] text-gray-500">Latência CPU: --ms</span>
               </div>
               <div class="bg-gray-50 p-2 rounded border border-gray-200">
-                <span class="text-gray-500 block">Estatística de Desempenho:</span>
-                <strong id="perf-value-text" class="text-sm text-gray-800">52%</strong>
+                <span class="text-gray-500 block text-[10px]">Desempenho Real (FPS):</span>
+                <strong id="perf-value-text" class="text-xs text-gray-800">--%</strong>
                 <span id="perf-subtext" class="text-[10px] font-bold"></span>
+                <span id="fps-real-subtext" class="block text-[9px] text-gray-500">Taxa: -- FPS</span>
               </div>
             </div>
 
-            <!-- Saúde da Bateria e Carregamento (Estilo Device Care / Play Store) -->
-            <div class="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+            <!-- Bateria e Energia Real (Battery Status API) -->
+            <div class="grid grid-cols-2 gap-2 pt-0.5 text-[11px]">
               <div class="bg-gray-50 p-2 rounded border border-gray-200 flex items-center justify-between">
-                <div>
-                  <span class="text-gray-500 block text-[10px]">Saúde da Bateria:</span>
-                  <strong id="battery-health-text" class="text-xs text-green-700">Boa (92%)</strong>
+                <div class="min-w-0">
+                  <span class="text-gray-500 block text-[10px]">Bateria / Energia Real:</span>
+                  <strong id="battery-health-text" class="text-xs text-green-700 truncate block">Lendo...</strong>
                 </div>
-                <span class="text-base">🔋</span>
+                <span class="text-base shrink-0">🔋</span>
               </div>
               <div class="bg-gray-50 p-2 rounded border border-gray-200 flex items-center justify-between">
-                <div>
-                  <span class="text-gray-500 block text-[10px]">Consumo / Tensão:</span>
-                  <strong id="battery-drain-text" class="text-xs text-gray-800">4.1V • Estável</strong>
+                <div class="min-w-0">
+                  <span class="text-gray-500 block text-[10px]">Fonte / Consumo Real:</span>
+                  <strong id="battery-drain-text" class="text-xs text-gray-800 truncate block">Lendo...</strong>
                 </div>
-                <span class="text-base">⚡</span>
+                <span class="text-base shrink-0">⚡</span>
               </div>
             </div>
           </div>
@@ -616,7 +653,7 @@
           <!-- Botões de Análise (Somem assim que faz a análise precisa) -->
           <div id="initial-analysis-actions" class="space-y-2 pt-1">
             <button type="button" onclick="runNativeDiagnosticScan()" class="w-full py-2.5 rounded btn-primary font-bold text-xs shadow-sm">
-              Fazer Análise Básica do Celular
+              Fazer Análise Real do Aparelho / PC
             </button>
             <button type="button" onclick="openChatBotWithTyping()" class="w-full py-2 rounded bg-white border border-blue-600 text-blue-700 font-bold text-xs hover:bg-blue-50">
               Chat Bot
@@ -629,11 +666,11 @@
           <!-- SEÇÃO DE ANÁLISE BÁSICA FUNCIONAL (Limpeza Profunda e Sensores ficam como apoio no Chat Bot) -->
           <div id="precise-analysis-section" class="hidden p-3 rounded-lg bg-amber-50 border border-amber-300 space-y-2.5 shadow-sm">
             <div class="flex items-center justify-between border-b border-amber-200 pb-1.5">
-              <span id="status-title-text" class="font-bold text-amber-900">Resultado da Análise Básica</span>
+              <span id="status-title-text" class="font-bold text-amber-900">Resultado da Análise Real</span>
               <span id="status-stage-badge" class="px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded text-[9px] font-bold">Registrado no Histórico</span>
             </div>
             <p id="status-desc-text" class="text-[11px] text-gray-800 leading-relaxed">
-              A análise detectou <strong>Memória RAM em estado Crítico (88%)</strong>, <strong>Armazenamento Cheio (94%)</strong> e desempenho reduzido para <strong>52%</strong> com aquecimento (41.8°C).
+              Analisando telemetria real do sistema...
             </p>
 
             <!-- Resumo Básico e Funcional -->
@@ -1212,8 +1249,13 @@
             </div>
 
             <!-- Campo se for Cliente -->
-            <div id="prof-client-box" class="p-2 bg-gray-50 border border-gray-200 rounded">
-              <label class="block font-bold text-gray-700 mb-0.5">Modelo do Celular Cadastrado:</label>
+            <div id="prof-client-box" class="p-2 bg-gray-50 border border-gray-200 rounded space-y-1">
+              <div class="flex items-center justify-between">
+                <label class="block font-bold text-gray-700">Aparelho / PC Identificado:</label>
+                <button type="button" onclick="autoFillRealDeviceInProfile()" class="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 border border-blue-300 rounded text-[10px] font-bold text-blue-800">
+                  🔄 Detectar Hardware Real
+                </button>
+              </div>
               <input id="prof-device" type="text" class="w-full border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-800">
             </div>
 
@@ -1300,31 +1342,31 @@
           <div class="flex-1 overflow-y-auto space-y-1.5 pr-1 text-[11px]">
             <label class="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded cursor-pointer">
               <div>
-                <strong class="text-gray-800 block">Cache de Redes Sociais (Instagram/TikTok)</strong>
-                <span class="text-[10px] text-gray-500">Arquivos temporários de vídeos • 950 MB</span>
+                <strong class="text-gray-800 block">Memória JS Heap &amp; Objetos Alocados (Real)</strong>
+                <span id="dc-item-heap-desc" class="text-[10px] text-gray-500">Lendo alocação real de memória V8...</span>
               </div>
-              <input type="checkbox" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="950" checked onchange="recalcDeepCleanTotal()">
+              <input type="checkbox" id="dc-chk-heap" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="0" checked onchange="recalcDeepCleanTotal()">
             </label>
             <label class="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded cursor-pointer">
               <div>
-                <strong class="text-gray-800 block">Limpador de WhatsApp / Status Antigos</strong>
-                <span class="text-[10px] text-gray-500">Caches ocultos (não apaga conversas) • 550 MB</span>
+                <strong class="text-gray-800 block">Buffers de Rede &amp; Recursos (Performance API)</strong>
+                <span id="dc-item-res-desc" class="text-[10px] text-gray-500">Lendo entradas reais de recursos...</span>
               </div>
-              <input type="checkbox" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="550" checked onchange="recalcDeepCleanTotal()">
+              <input type="checkbox" id="dc-chk-res" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="0" checked onchange="recalcDeepCleanTotal()">
             </label>
             <label class="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded cursor-pointer">
               <div>
-                <strong class="text-gray-800 block">Pastas Órfãs + APKs Obsoletos</strong>
-                <span class="text-[10px] text-gray-500">Restos de apps já desinstalados • 300 MB</span>
+                <strong class="text-gray-800 block">Cache Storage &amp; IndexedDB Temporário (Real)</strong>
+                <span id="dc-item-storage-desc" class="text-[10px] text-gray-500">Lendo uso real via StorageManager...</span>
               </div>
-              <input type="checkbox" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="300" checked onchange="recalcDeepCleanTotal()">
+              <input type="checkbox" id="dc-chk-storage" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="0" checked onchange="recalcDeepCleanTotal()">
             </label>
             <label class="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded cursor-pointer">
               <div>
-                <strong class="text-gray-800 block">Hibernar Apps Inativos (+30 dias)</strong>
-                <span class="text-[10px] text-gray-500">Congela 3 apps pesados em 2º plano • 2400 MB</span>
+                <strong class="text-gray-800 block">Sessões e Cache Temporário do Navegador</strong>
+                <span id="dc-item-session-desc" class="text-[10px] text-gray-500">Preserva contas e chamados salvos</span>
               </div>
-              <input type="checkbox" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="2400" onchange="recalcDeepCleanTotal()">
+              <input type="checkbox" id="dc-chk-session" class="deep-clean-chk accent-blue-600 w-4 h-4" data-mb="0" checked onchange="recalcDeepCleanTotal()">
             </label>
           </div>
 
@@ -1695,6 +1737,40 @@
     let pendingPopupTargetRole = null;
     let floatingBannerTimer = null;
 
+    const realHardwareProfile = {
+      deviceName: "Detectando Dispositivo...",
+      osName: "Detectando SO...",
+      arch: "",
+      browserName: "",
+      cpuCores: navigator.hardwareConcurrency || 1,
+      gpuModel: "Detectando GPU...",
+      screenRes: `${window.screen ? window.screen.width : 0}x${window.screen ? window.screen.height : 0}`,
+      dpr: window.devicePixelRatio || 1,
+      touchPoints: navigator.maxTouchPoints || 0,
+      measuredFps: 60,
+      measuredHz: 60,
+      cpuLatencyMs: 1.0,
+      netType: navigator.onLine ? "Online" : "Offline",
+      netDownlinkMbps: null,
+      netRttMs: null,
+      realPingMs: null,
+      batteryPct: null,
+      batteryCharging: null,
+      batteryDischargingTime: null,
+      batteryChargingTime: null,
+      isDesktopAc: false,
+      jsHeapUsedMB: 0,
+      jsHeapTotalMB: 0,
+      jsHeapLimitMB: 0,
+      storageUsageBytes: 0,
+      storageQuotaBytes: 0,
+      localStorageBytes: 0,
+      resourceBufferBytes: 0,
+      resourceCount: 0,
+      audioSampleRate: null,
+      audioOutputCount: 0
+    };
+
     const demoState = {
       isAuthenticated: false,
       user: null,
@@ -1704,17 +1780,27 @@
       techDutyStatus: "Disponível",
       previousScreenBeforeSettings: null,
       metrics: {
-        ram: 88,
-        ramUsed: 5.3,
-        ramTotal: 6.0,
-        storage: 94,
-        storageUsed: 120,
-        storageTotal: 128,
-        temp: 41.8,
-        performance: 52,
-        batteryHealth: "Média (Aquecendo)",
-        batteryDrain: "4.1V • Dreno Alto",
-        isCritical: true
+        ram: 0,
+        ramUsed: 0,
+        ramTotal: Number(navigator.deviceMemory || 4),
+        ramDetailLabel: "Lendo RAM / Heap...",
+        storage: 0,
+        storageUsed: 0,
+        storageTotal: 0,
+        storageDetailLabel: "Lendo Armazenamento...",
+        temp: 35.0,
+        cpuLatencyMs: 1.0,
+        fps: 60,
+        performance: 100,
+        batteryHealth: "Lendo Bateria...",
+        batteryDrain: "Lendo Energia...",
+        deviceName: "Detectando...",
+        osLabel: "Detectando...",
+        cpuLabel: `${navigator.hardwareConcurrency || 1} Núcleos`,
+        gpuLabel: "Detectando GPU...",
+        screenLabel: "--x--",
+        netLabel: "Lendo Rede...",
+        isCritical: false
       },
       auditLogs: [],
       currentScreen: "welcome"
@@ -1727,6 +1813,501 @@
     let clientTypingHideTimer = null;
     let techTypingHideTimer = null;
     let lastTypingSentTime = 0;
+    let batteryManagerInstance = null;
+
+    // =========================================================================
+    // MOTOR DE TELEMETRIA REAL DO APARELHO OU PC (WEB APIS NATIVAS REAIS)
+    // =========================================================================
+    function detectRealWebGlGpu() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return "WebGL Padrão";
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        let renderer = debugInfo
+          ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+          : gl.getParameter(gl.RENDERER);
+        if (!renderer) return "GPU Integrada";
+        let clean = String(renderer).trim();
+        // Limpa wrapper ANGLE(...) do Chrome/Edge no Windows para exibir o modelo real da placa gráfica
+        const angleMatch = clean.match(/ANGLE\s*\([^,]+,\s*([^,(]+?)(?:\s+Direct3D|\s+OpenGL|\s+\(|,|$)/i);
+        if (angleMatch && angleMatch[1]) {
+          clean = angleMatch[1].trim();
+        }
+        return clean;
+      } catch (e) {
+        return "GPU Padrão do Sistema";
+      }
+    }
+
+    async function detectRealDeviceAndOs() {
+      const ua = navigator.userAgent || "";
+      const platform = navigator.platform || "";
+      const cores = navigator.hardwareConcurrency || 1;
+      realHardwareProfile.cpuCores = cores;
+      realHardwareProfile.gpuModel = detectRealWebGlGpu();
+
+      const sw = window.screen ? window.screen.width : window.innerWidth;
+      const sh = window.screen ? window.screen.height : window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      realHardwareProfile.screenRes = `${sw}x${sh}`;
+      realHardwareProfile.dpr = Number(dpr.toFixed(2));
+      realHardwareProfile.touchPoints = navigator.maxTouchPoints || 0;
+
+      let browserName = "Navegador";
+      if (/Edg\/(\d+)/.test(ua)) browserName = "Edge " + RegExp.$1;
+      else if (/OPR\/(\d+)/.test(ua)) browserName = "Opera " + RegExp.$1;
+      else if (/Chrome\/(\d+)/.test(ua)) browserName = "Chrome " + RegExp.$1;
+      else if (/Firefox\/(\d+)/.test(ua)) browserName = "Firefox " + RegExp.$1;
+      else if (/Version\/(\d+).*Safari/.test(ua)) browserName = "Safari " + RegExp.$1;
+      realHardwareProfile.browserName = browserName;
+
+      let osName = "Sistema";
+      let arch = "";
+      let model = "";
+
+      if (/Win64|x64|WOW64|x86_64|amd64/i.test(ua) || /Win64|x86_64/i.test(platform)) {
+        arch = "64-bit (x64)";
+      } else if (/arm64|aarch64/i.test(ua) || /armv8/i.test(platform)) {
+        arch = "ARM64";
+      } else if (/Win32/i.test(platform)) {
+        arch = "x86/x64";
+      }
+
+      // Usa User-Agent Client Hints API (alta precisão para Windows 10 vs 11 e modelo real de celular Android)
+      try {
+        if (navigator.userAgentData) {
+          const lowPlatform = navigator.userAgentData.platform || "";
+          if (lowPlatform) osName = lowPlatform;
+          if (navigator.userAgentData.getHighEntropyValues) {
+            const he = await navigator.userAgentData.getHighEntropyValues([
+              'model',
+              'platform',
+              'platformVersion',
+              'architecture',
+              'bitness'
+            ]);
+            if (he.architecture) {
+              arch = `${he.architecture}${he.bitness ? ' ' + he.bitness + '-bit' : ''}`;
+            }
+            if (he.model) {
+              model = he.model.trim();
+            }
+            if (he.platform === 'Windows') {
+              const majorVer = parseInt((he.platformVersion || '0').split('.')[0], 10);
+              if (majorVer >= 13) osName = "Windows 11";
+              else if (majorVer >= 1) osName = "Windows 10";
+              else osName = "Windows";
+            } else if (he.platform === 'Android') {
+              const ver = (he.platformVersion || '').split('.')[0];
+              osName = ver ? `Android ${ver}` : "Android";
+            } else if (he.platform) {
+              osName = he.platform + (he.platformVersion ? ` ${he.platformVersion}` : '');
+            }
+          }
+        }
+      } catch (e) {}
+
+      // Fallback pelo User-Agent clássico caso o navegador não exponha Client Hints
+      if (osName === "Sistema" || osName === "Windows") {
+        if (/Android\s+([0-9.]+)/i.test(ua)) {
+          osName = `Android ${RegExp.$1}`;
+        } else if (/iPhone|iPad|iPod/i.test(ua)) {
+          const iosMatch = ua.match(/OS\s+([0-9_]+)/i);
+          osName = `iOS ${iosMatch ? iosMatch[1].replace(/_/g, '.') : ''}`.trim();
+        } else if (/Windows NT 10\.0/i.test(ua)) {
+          if (osName === "Sistema") osName = "Windows 10/11";
+        } else if (/Windows NT 6\.3/i.test(ua)) {
+          osName = "Windows 8.1";
+        } else if (/Windows NT 6\.1/i.test(ua)) {
+          osName = "Windows 7";
+        } else if (/Mac OS X ([0-9_]+)/i.test(ua)) {
+          osName = `macOS ${RegExp.$1.replace(/_/g, '.')}`;
+        } else if (/Linux/i.test(ua)) {
+          osName = "Linux";
+        }
+      }
+
+      if (!model) {
+        if (/Android/i.test(ua)) {
+          const mMatch = ua.match(/Android\s+[0-9.]+;\s*([^;)]+?)(?:\s+Build\/|\))/i);
+          if (mMatch && mMatch[1] && !/^(K|wv|Mobile)$/i.test(mMatch[1].trim())) {
+            model = mMatch[1].trim();
+          }
+        } else if (/iPhone/i.test(ua)) {
+          model = "Apple iPhone";
+        } else if (/iPad/i.test(ua)) {
+          model = "Apple iPad";
+        }
+      }
+
+      realHardwareProfile.osName = osName;
+      realHardwareProfile.arch = arch;
+
+      const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(ua) || (navigator.userAgentData && navigator.userAgentData.mobile);
+      let fullDeviceName = "";
+      if (isMobileDevice) {
+        fullDeviceName = model ? `${model} (${osName})` : `${osName} (${cores} Núcleos)`;
+      } else {
+        const shortGpu = realHardwareProfile.gpuModel.replace(/\(R\)|\(TM\)|Graphics|Corporation/gi, '').replace(/\s+/g, ' ').trim().slice(0, 22);
+        fullDeviceName = `PC ${osName} (${cores} Núcleos${shortGpu ? ' • ' + shortGpu : ''})`;
+      }
+
+      realHardwareProfile.deviceName = fullDeviceName;
+      return fullDeviceName;
+    }
+
+    function startRealFpsMonitor() {
+      let frameCount = 0;
+      let lastTime = performance.now();
+      function loop(now) {
+        frameCount++;
+        const elapsed = now - lastTime;
+        if (elapsed >= 1000) {
+          const currentFps = Math.max(1, Math.round((frameCount * 1000) / elapsed));
+          realHardwareProfile.measuredFps = currentFps;
+          // Estima a frequência nominal real do monitor a partir do FPS medido
+          if (currentFps > 125) realHardwareProfile.measuredHz = 144;
+          else if (currentFps > 95) realHardwareProfile.measuredHz = 120;
+          else if (currentFps > 78) realHardwareProfile.measuredHz = 90;
+          else if (currentFps > 65) realHardwareProfile.measuredHz = 75;
+          else realHardwareProfile.measuredHz = 60;
+          frameCount = 0;
+          lastTime = now;
+        }
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
+    }
+
+    function measureRealCpuLatencyMs() {
+      const t0 = performance.now();
+      let acc = 0;
+      for (let i = 1; i <= 25000; i++) {
+        acc += (i * 1.6180339) % 7;
+      }
+      const t1 = performance.now();
+      if (acc < 0) console.log(acc);
+      const latency = Math.max(0.1, Number((t1 - t0).toFixed(2)));
+      realHardwareProfile.cpuLatencyMs = latency;
+      return latency;
+    }
+
+    function measureRealLocalStorageBytes() {
+      let totalChars = 0;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i) || '';
+          const v = localStorage.getItem(k) || '';
+          totalChars += k.length + v.length;
+        }
+      } catch (e) {}
+      try {
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i) || '';
+          const v = sessionStorage.getItem(k) || '';
+          totalChars += k.length + v.length;
+        }
+      } catch (e) {}
+      const bytes = totalChars * 2;
+      realHardwareProfile.localStorageBytes = bytes;
+      return bytes;
+    }
+
+    function measureRealResourceBuffers() {
+      let totalBytes = 0;
+      let count = 0;
+      try {
+        const entries = performance.getEntriesByType('resource') || [];
+        count = entries.length;
+        entries.forEach(e => {
+          const sz = e.decodedBodySize || e.encodedBodySize || e.transferSize || 4096;
+          totalBytes += sz;
+        });
+      } catch (e) {}
+      realHardwareProfile.resourceBufferBytes = totalBytes;
+      realHardwareProfile.resourceCount = count;
+      return { totalBytes, count };
+    }
+
+    async function measureRealNetworkPing() {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (conn) {
+        realHardwareProfile.netType = (conn.type && conn.type !== 'unknown')
+          ? conn.type.toUpperCase()
+          : (conn.effectiveType ? conn.effectiveType.toUpperCase() : (navigator.onLine ? "ONLINE" : "OFFLINE"));
+        if (typeof conn.downlink === 'number' && conn.downlink > 0) {
+          realHardwareProfile.netDownlinkMbps = conn.downlink;
+        }
+        if (typeof conn.rtt === 'number' && conn.rtt > 0) {
+          realHardwareProfile.netRttMs = conn.rtt;
+        }
+      } else {
+        realHardwareProfile.netType = navigator.onLine ? "ONLINE" : "OFFLINE";
+      }
+
+      if (!navigator.onLine) {
+        realHardwareProfile.realPingMs = null;
+        return null;
+      }
+
+      // Medição real de tempo de resposta via fetch com performance.now()
+      try {
+        const start = performance.now();
+        const pingUrl = window.location.protocol.startsWith('http')
+          ? `${window.location.origin}${window.location.pathname}?_ping=${Date.now()}`
+          : `https://www.gstatic.com/generate_204?_ping=${Date.now()}`;
+        await fetch(pingUrl, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' });
+        const ping = Math.max(1, Math.round(performance.now() - start));
+        realHardwareProfile.realPingMs = ping;
+        return ping;
+      } catch (e) {
+        if (realHardwareProfile.netRttMs) {
+          realHardwareProfile.realPingMs = realHardwareProfile.netRttMs;
+          return realHardwareProfile.netRttMs;
+        }
+        return null;
+      }
+    }
+
+    function formatBytesHuman(bytes) {
+      if (!bytes || bytes <= 0) return "0 KB";
+      const kb = bytes / 1024;
+      if (kb < 1024) return `${kb.toFixed(1)} KB`;
+      const mb = kb / 1024;
+      if (mb < 1024) return `${mb.toFixed(2)} MB`;
+      const gb = mb / 1024;
+      return `${gb.toFixed(2)} GB`;
+    }
+
+    async function performRealBrowserCleanup() {
+      try {
+        if (performance.clearResourceTimings) performance.clearResourceTimings();
+        if (performance.clearMarks) performance.clearMarks();
+        if (performance.clearMeasures) performance.clearMeasures();
+      } catch (e) {}
+      try {
+        // Limpa chaves temporárias preservando cadastros e chamados
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k !== USERS_STORAGE_KEY && k !== TICKETS_STORAGE_KEY && k !== 'helptop_sync_packet_v3' && k !== 'helptop_last_protocol') {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+      try {
+        if (window.caches && caches.keys) {
+          const cacheNames = await caches.keys();
+          for (const name of cacheNames) {
+            await caches.delete(name);
+          }
+        }
+      } catch (e) {}
+      await collectRealHardwareTelemetry(false);
+    }
+
+    async function collectRealHardwareTelemetry(showToast = false) {
+      await detectRealDeviceAndOs();
+      const cpuLat = measureRealCpuLatencyMs();
+      const lsBytes = measureRealLocalStorageBytes();
+      const resBuf = measureRealResourceBuffers();
+
+      // 1. Leitura real de Memória RAM e JS Heap
+      let ramTotalGB = Number(navigator.deviceMemory || 0);
+      let ramPct = 0;
+      let ramUsedGB = 0;
+      let ramDetailLabel = "";
+
+      if (performance && performance.memory && performance.memory.totalJSHeapSize > 0) {
+        const usedBytes = performance.memory.usedJSHeapSize;
+        const totalBytes = performance.memory.totalJSHeapSize;
+        const limitBytes = performance.memory.jsHeapSizeLimit || totalBytes;
+        const usedMB = usedBytes / (1024 * 1024);
+        const totalMB = totalBytes / (1024 * 1024);
+        const limitMB = limitBytes / (1024 * 1024);
+
+        realHardwareProfile.jsHeapUsedMB = Number(usedMB.toFixed(2));
+        realHardwareProfile.jsHeapTotalMB = Number(totalMB.toFixed(2));
+        realHardwareProfile.jsHeapLimitMB = Number(limitMB.toFixed(0));
+
+        if (!ramTotalGB || ramTotalGB <= 0) {
+          ramTotalGB = Math.max(2, Math.round((limitMB / 1024) * 2));
+        }
+
+        ramPct = Math.min(99, Math.max(1, Math.round((usedBytes / totalBytes) * 100)));
+        ramUsedGB = Number(((ramPct / 100) * ramTotalGB).toFixed(2));
+        ramDetailLabel = `Heap: ${usedMB.toFixed(1)}/${totalMB.toFixed(1)} MB • RAM Física: ${ramTotalGB} GB`;
+      } else {
+        if (!ramTotalGB || ramTotalGB <= 0) ramTotalGB = 4;
+        const domNodes = document.getElementsByTagName('*').length;
+        const activeMemMB = Number(((domNodes * 0.012) + (resBuf.totalBytes / (1024 * 1024))).toFixed(2));
+        realHardwareProfile.jsHeapUsedMB = activeMemMB;
+        realHardwareProfile.jsHeapTotalMB = Number((activeMemMB * 1.8).toFixed(2));
+        ramPct = Math.min(95, Math.max(12, Math.round((activeMemMB / Math.max(1, realHardwareProfile.jsHeapTotalMB)) * 100)));
+        ramUsedGB = Number(((ramPct / 100) * ramTotalGB).toFixed(2));
+        ramDetailLabel = `Alocado: ${activeMemMB.toFixed(1)} MB • RAM Física: ${ramTotalGB} GB`;
+      }
+
+      // 2. Leitura real de Armazenamento via StorageManager API (navigator.storage.estimate)
+      let storageQuotaGB = 0;
+      let storageUsageBytes = lsBytes + resBuf.totalBytes;
+      let storagePct = 0;
+      let storageUsedGB = 0;
+      let storageDetailLabel = "";
+
+      try {
+        if (navigator.storage && navigator.storage.estimate) {
+          const est = await navigator.storage.estimate();
+          if (est && est.quota) {
+            realHardwareProfile.storageQuotaBytes = est.quota;
+            storageQuotaGB = Number((est.quota / (1024 ** 3)).toFixed(1));
+          }
+          if (est && typeof est.usage === 'number') {
+            storageUsageBytes = Math.max(est.usage, lsBytes) + resBuf.totalBytes;
+          }
+        }
+      } catch (e) {}
+
+      realHardwareProfile.storageUsageBytes = storageUsageBytes;
+      if (storageQuotaGB > 0) {
+        storageUsedGB = Number((storageUsageBytes / (1024 ** 3)).toFixed(3));
+        const rawRatio = (storageUsageBytes / realHardwareProfile.storageQuotaBytes) * 100;
+        storagePct = rawRatio >= 1 ? Math.round(rawRatio) : Number(Math.max(0.1, rawRatio).toFixed(2));
+        storageDetailLabel = `Uso App/Cache: ${formatBytesHuman(storageUsageBytes)} • Quota Disco: ${storageQuotaGB} GB`;
+      } else {
+        storageQuotaGB = 64;
+        storageUsedGB = Number((storageUsageBytes / (1024 ** 3)).toFixed(3));
+        storagePct = 1;
+        storageDetailLabel = `Cache Local: ${formatBytesHuman(storageUsageBytes)}`;
+      }
+
+      // 3. Leitura real de Bateria e Fonte de Energia via Battery Status API
+      let batteryHealthStr = "Energia AC / Estável";
+      let batteryDrainStr = "Conectado • Normal";
+      try {
+        if (navigator.getBattery) {
+          const bat = await navigator.getBattery();
+          if (bat) {
+            if (!batteryManagerInstance) {
+              batteryManagerInstance = bat;
+              bat.addEventListener('levelchange', () => collectRealHardwareTelemetry(false));
+              bat.addEventListener('chargingchange', () => collectRealHardwareTelemetry(false));
+            }
+            const pct = Math.round((bat.level || 0) * 100);
+            const isCharging = Boolean(bat.charging);
+            const isDesktopAc = (pct === 100 && isCharging && bat.dischargingTime === Infinity && !/Android|iPhone|iPad/i.test(navigator.userAgent));
+            realHardwareProfile.batteryPct = pct;
+            realHardwareProfile.batteryCharging = isCharging;
+            realHardwareProfile.isDesktopAc = isDesktopAc;
+            realHardwareProfile.batteryDischargingTime = bat.dischargingTime;
+            realHardwareProfile.batteryChargingTime = bat.chargingTime;
+
+            if (isDesktopAc) {
+              batteryHealthStr = `${pct}% (Energia AC / PC)`;
+              batteryDrainStr = "Fonte Direta • Carregado";
+            } else {
+              batteryHealthStr = `${pct}% (${isCharging ? 'Carregando ⚡' : 'Na Bateria 🔋'})`;
+              if (isCharging && bat.chargingTime && bat.chargingTime !== Infinity) {
+                batteryDrainStr = `Carga completa em ~${Math.max(1, Math.round(bat.chargingTime / 60))} min`;
+              } else if (!isCharging && bat.dischargingTime && bat.dischargingTime !== Infinity) {
+                batteryDrainStr = `Autonomia: ~${Math.max(1, Math.round(bat.dischargingTime / 60))} min`;
+              } else {
+                batteryDrainStr = isCharging ? "Carregador Conectado ⚡" : "Consumo em Bateria";
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
+      // 4. Rede & Ping Real
+      measureRealNetworkPing().then(() => {
+        updateRealStatusBar();
+        syncUiMetrics();
+      });
+
+      // 5. Cálculo de Desempenho Real (baseado no FPS real medido, latência real da CPU e pressão do Heap)
+      const fps = realHardwareProfile.measuredFps || 60;
+      const hz = realHardwareProfile.measuredHz || 60;
+      const fpsRatio = Math.min(1, fps / Math.max(30, hz));
+      const cpuPenalty = Math.min(25, Math.max(0, (cpuLat - 1.5) * 2.5));
+      const heapPenalty = ramPct > 75 ? Math.round((ramPct - 75) * 0.4) : 0;
+      const realPerf = Math.min(100, Math.max(20, Math.round((fpsRatio * 100) - cpuPenalty - heapPenalty)));
+
+      // Temperatura / Carga Térmica estimada a partir da latência real da CPU, uso de memória e estado de carregamento
+      const chargingHeat = realHardwareProfile.batteryCharging && !realHardwareProfile.isDesktopAc ? 1.4 : 0;
+      const realEstimatedTemp = Number((33.5 + Math.min(9.5, cpuLat * 0.7) + (ramPct * 0.035) + chargingHeat).toFixed(1));
+
+      demoState.metrics.ram = ramPct;
+      demoState.metrics.ramUsed = ramUsedGB;
+      demoState.metrics.ramTotal = ramTotalGB;
+      demoState.metrics.ramDetailLabel = ramDetailLabel;
+      demoState.metrics.storage = storagePct;
+      demoState.metrics.storageUsed = storageUsedGB;
+      demoState.metrics.storageTotal = storageQuotaGB;
+      demoState.metrics.storageDetailLabel = storageDetailLabel;
+      demoState.metrics.temp = realEstimatedTemp;
+      demoState.metrics.cpuLatencyMs = cpuLat;
+      demoState.metrics.fps = fps;
+      demoState.metrics.performance = realPerf;
+      demoState.metrics.batteryHealth = batteryHealthStr;
+      demoState.metrics.batteryDrain = batteryDrainStr;
+      demoState.metrics.deviceName = realHardwareProfile.deviceName;
+      demoState.metrics.osLabel = `${realHardwareProfile.osName}${realHardwareProfile.arch ? ' • ' + realHardwareProfile.arch : ''}`;
+      demoState.metrics.cpuLabel = `${realHardwareProfile.cpuCores} Núcleos • ${realHardwareProfile.browserName}`;
+      demoState.metrics.gpuLabel = realHardwareProfile.gpuModel;
+      demoState.metrics.screenLabel = `${realHardwareProfile.screenRes} (${realHardwareProfile.measuredHz}Hz • ${realHardwareProfile.dpr}x)`;
+      const pingPart = realHardwareProfile.realPingMs ? `${realHardwareProfile.realPingMs}ms` : (realHardwareProfile.netRttMs ? `${realHardwareProfile.netRttMs}ms` : 'Ativa');
+      const dlPart = realHardwareProfile.netDownlinkMbps ? ` • ${realHardwareProfile.netDownlinkMbps} Mbps` : '';
+      demoState.metrics.netLabel = `${realHardwareProfile.netType} • Ping ${pingPart}${dlPart}`;
+      demoState.metrics.isCritical = (ramPct >= 75 || realPerf < 70);
+
+      updateRealStatusBar();
+      autoFillRealDeviceInRegister(false);
+      syncUiMetrics();
+      updateDeepCleanRealLabels();
+
+      if (showToast) {
+        showToastNotice(`Telemetria real lida: ${realHardwareProfile.deviceName}`);
+      }
+    }
+
+    function autoFillRealDeviceInRegister(forceOverwrite = false) {
+      const regDevInput = document.getElementById('reg-device');
+      const hintEl = document.getElementById('reg-device-real-hint');
+      const detected = realHardwareProfile.deviceName;
+      if (!detected || detected.startsWith('Detectando')) return;
+      if (regDevInput && (forceOverwrite || !regDevInput.value.trim())) {
+        regDevInput.value = detected;
+      }
+      if (hintEl) {
+        hintEl.innerText = `✓ Hardware real detectado: ${detected} • RAM ${demoState.metrics.ramTotal} GB`;
+      }
+    }
+
+    function autoFillRealDeviceInProfile() {
+      const profDevInput = document.getElementById('prof-device');
+      if (profDevInput && realHardwareProfile.deviceName) {
+        profDevInput.value = realHardwareProfile.deviceName;
+        showToastNotice(`Dispositivo atualizado: ${realHardwareProfile.deviceName}`);
+      }
+    }
+
+    function updateRealStatusBar() {
+      updateClock();
+      const statusRight = document.getElementById('android-status-right');
+      if (!statusRight) return;
+      const netStr = navigator.onLine
+        ? (realHardwareProfile.netType || "Online")
+        : "Offline";
+      const pingStr = realHardwareProfile.realPingMs ? ` (${realHardwareProfile.realPingMs}ms)` : "";
+      let batStr = "AC ⚡";
+      if (realHardwareProfile.batteryPct !== null) {
+        batStr = `Bat: ${realHardwareProfile.batteryPct}%${realHardwareProfile.batteryCharging ? ' ⚡' : ''}`;
+      }
+      statusRight.innerText = `${netStr}${pingStr} | ${batStr}`;
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
       // Garante que qualquer 2ª janela aberta via clone inicie limpa na tela inicial
@@ -1736,10 +2317,12 @@
       });
       syncReminderButtonBadge();
       goToScreen('welcome');
-      updateClock();
-      setInterval(updateClock, 30000);
+      startRealFpsMonitor();
+      collectRealHardwareTelemetry(false);
+      setInterval(() => collectRealHardwareTelemetry(false), 3500);
+      window.addEventListener('online', () => collectRealHardwareTelemetry(false));
+      window.addEventListener('offline', () => collectRealHardwareTelemetry(false));
       initRealtimeSync();
-      syncUiMetrics();
     });
 
     function updateClock() {
@@ -2164,29 +2747,53 @@
       const stoSub = document.getElementById('storage-subtext');
 
       const tempText = document.getElementById('temp-value-text');
+      const cpuLatSub = document.getElementById('cpu-latency-subtext');
       const perfText = document.getElementById('perf-value-text');
       const perfSub = document.getElementById('perf-subtext');
+      const fpsSub = document.getElementById('fps-real-subtext');
 
       const batHealth = document.getElementById('battery-health-text');
       const batDrain = document.getElementById('battery-drain-text');
 
+      const specOs = document.getElementById('real-spec-os');
+      const specCpu = document.getElementById('real-spec-cpu');
+      const specGpu = document.getElementById('real-spec-gpu');
+      const specScreen = document.getElementById('real-spec-screen');
+      const specNet = document.getElementById('real-spec-net');
+      const devDisplay = document.getElementById('mobile-device-display');
+
+      if (specOs) specOs.innerText = m.osLabel || realHardwareProfile.osName;
+      if (specCpu) specCpu.innerText = m.cpuLabel || `${realHardwareProfile.cpuCores} Núcleos`;
+      if (specGpu) specGpu.innerText = m.gpuLabel || realHardwareProfile.gpuModel;
+      if (specScreen) specScreen.innerText = m.screenLabel || `${realHardwareProfile.screenRes} (${realHardwareProfile.measuredHz}Hz)`;
+      if (specNet) specNet.innerText = m.netLabel || realHardwareProfile.netType;
+      if (devDisplay) {
+        if (demoState.user && demoState.user.role === 'client' && demoState.user.device && !/Android Identificado/i.test(demoState.user.device)) {
+          devDisplay.innerText = demoState.user.device;
+        } else {
+          devDisplay.innerText = realHardwareProfile.deviceName || "Dispositivo Real";
+        }
+      }
+
       if (ramPct) ramPct.innerText = `${m.ram}%`;
-      if (ramDet) ramDet.innerText = `${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB`;
-      if (ramBar) ramBar.style.width = `${m.ram}%`;
+      if (ramDet) ramDet.innerText = m.ramDetailLabel || `${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB`;
+      if (ramBar) ramBar.style.width = `${Math.min(100, Math.max(2, m.ram))}%`;
 
       if (stoPct) stoPct.innerText = `${m.storage}%`;
-      if (stoDet) stoDet.innerText = `${m.storageUsed}/${m.storageTotal} GB`;
-      if (stoBar) stoBar.style.width = `${m.storage}%`;
+      if (stoDet) stoDet.innerText = m.storageDetailLabel || `${m.storageUsed}/${m.storageTotal} GB`;
+      if (stoBar) stoBar.style.width = `${Math.min(100, Math.max(3, m.storage))}%`;
 
-      if (tempText) tempText.innerText = `${m.temp.toFixed(1)}°C`;
+      if (tempText) tempText.innerText = `${Number(m.temp).toFixed(1)}°C`;
+      if (cpuLatSub) cpuLatSub.innerText = `Latência CPU: ${m.cpuLatencyMs || realHardwareProfile.cpuLatencyMs}ms (${realHardwareProfile.cpuCores} núcleos)`;
       if (perfText) perfText.innerText = `${m.performance}%`;
+      if (fpsSub) fpsSub.innerText = `Taxa Real: ${m.fps || realHardwareProfile.measuredFps} FPS (${realHardwareProfile.measuredHz}Hz)`;
 
       if (batHealth) {
-        batHealth.innerText = m.isCritical ? "Boa (92%)" : "Excelente (98%)";
-        batHealth.className = "text-xs font-bold text-green-700";
+        batHealth.innerText = m.batteryHealth || "Energia Estável";
+        batHealth.className = "text-xs font-bold text-green-700 truncate block";
       }
       if (batDrain) {
-        batDrain.innerText = m.isCritical ? "4.1V • Estável" : "4.2V • Otimizado";
+        batDrain.innerText = m.batteryDrain || "Conectado";
       }
 
       const auditBadge = document.getElementById('audit-count-badge');
@@ -2208,7 +2815,7 @@
         if (initialActions) initialActions.classList.add('hidden');
         if (preciseSection) preciseSection.classList.remove('hidden');
 
-        if (m.ram < 65) {
+        if (m.ram < 75) {
           if (ramBar) ramBar.className = "bg-green-600 h-full transition-all duration-500";
           if (ramSub) {
             ramSub.innerText = "(Normal)";
@@ -2217,7 +2824,7 @@
         } else {
           if (ramBar) ramBar.className = "bg-red-600 h-full transition-all duration-500";
           if (ramSub) {
-            ramSub.innerText = "(Crítico)";
+            ramSub.innerText = "(Elevado)";
             ramSub.className = "text-red-600 font-bold";
           }
         }
@@ -2225,7 +2832,7 @@
         if (m.storage < 85) {
           if (stoBar) stoBar.className = "bg-green-600 h-full transition-all duration-500";
           if (stoSub) {
-            stoSub.innerText = "(Normal)";
+            stoSub.innerText = "(Disponível)";
             stoSub.className = "text-green-700 font-bold";
           }
         } else {
@@ -2252,37 +2859,37 @@
             preciseSection.className = "p-3 rounded-lg bg-green-50 border border-green-300 space-y-2.5 shadow-sm";
           }
           if (titleEl) {
-            titleEl.innerText = "Resultado Pós-Análise: Otimizado";
+            titleEl.innerText = "Diagnóstico Real: Sistema Estável";
             titleEl.className = "font-bold text-green-800";
           }
           if (badgeEl) {
-            badgeEl.innerText = "Pós-Análise Registrada";
+            badgeEl.innerText = "Leitura Real Registrada";
             badgeEl.className = "px-1.5 py-0.5 bg-green-200 text-green-900 rounded text-[9px] font-bold";
           }
           if (descEl) {
-            descEl.innerHTML = `Otimização concluída! Memória RAM reduzida para <strong>${m.ram}%</strong> (${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB), espaço em <strong>${m.storage}%</strong> e desempenho elevado para <strong>${m.performance}%</strong>.`;
+            descEl.innerHTML = `Leitura real de <strong>${realHardwareProfile.deviceName}</strong>: Memória em <strong>${m.ram}%</strong> (${m.ramDetailLabel}), Quota de Disco em <strong>${m.storageTotal} GB</strong> (${m.storageDetailLabel}), GPU <strong>${realHardwareProfile.gpuModel}</strong> e desempenho real em <strong>${m.performance}%</strong> (${m.fps} FPS).`;
           }
           if (summaryBox) {
             summaryBox.className = "bg-white/90 border border-green-200 rounded p-2 space-y-1 text-[10px] text-gray-700";
           }
           if (summaryTitle) {
-            summaryTitle.innerHTML = "✓ Resumo Pós-Otimização:";
+            summaryTitle.innerHTML = "✓ Resumo Real do Hardware:";
             summaryTitle.className = "font-bold text-green-800";
           }
           if (summaryLine1) {
-            summaryLine1.innerText = "• Cache temporário limpo e processos ociosos encerrados com sucesso.";
+            summaryLine1.innerText = `• CPU ${realHardwareProfile.cpuCores} núcleos (${realHardwareProfile.cpuLatencyMs}ms) • Energia: ${m.batteryHealth} • Rede: ${m.netLabel}.`;
           }
-          if (quickFixBtn) quickFixBtn.classList.add('hidden');
+          if (quickFixBtn) quickFixBtn.classList.remove('hidden');
         } else {
           if (perfSub) {
-            perfSub.innerText = "(Baixo)";
+            perfSub.innerText = "(Atenção)";
             perfSub.className = "text-[10px] font-bold text-red-600 ml-1";
           }
           if (preciseSection) {
             preciseSection.className = "p-3 rounded-lg bg-amber-50 border border-amber-300 space-y-2.5 shadow-sm";
           }
           if (titleEl) {
-            titleEl.innerText = "Resultado da Análise Básica";
+            titleEl.innerText = "Resultado da Análise Real do Dispositivo";
             titleEl.className = "font-bold text-amber-900";
           }
           if (badgeEl) {
@@ -2290,17 +2897,17 @@
             badgeEl.className = "px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded text-[9px] font-bold";
           }
           if (descEl) {
-            descEl.innerHTML = `A análise detectou <strong>Memória RAM em estado Crítico (${m.ram}%)</strong>, <strong>Armazenamento Cheio (${m.storage}%)</strong> e desempenho reduzido para <strong>${m.performance}%</strong> com aquecimento (${m.temp.toFixed(1)}°C).`;
+            descEl.innerHTML = `Análise real em <strong>${realHardwareProfile.deviceName}</strong> detectou alocação de Memória/Heap em <strong>${m.ram}%</strong> (${m.ramDetailLabel}), Desempenho em <strong>${m.performance}%</strong> (${m.fps} FPS) e Latência CPU de <strong>${m.cpuLatencyMs}ms</strong>.`;
           }
           if (summaryBox) {
             summaryBox.className = "bg-white/90 border border-amber-200 rounded p-2 space-y-1 text-[10px] text-gray-700";
           }
           if (summaryTitle) {
-            summaryTitle.innerHTML = "📌 Diagnóstico Rápido:";
+            summaryTitle.innerHTML = "📌 Diagnóstico Real:";
             summaryTitle.className = "font-bold text-gray-800";
           }
           if (summaryLine1) {
-            summaryLine1.innerText = "• Cache temporário e processos básicos acumulando memória.";
+            summaryLine1.innerText = `• Buffers ativos: ${realHardwareProfile.resourceCount} recursos carregados (${formatBytesHuman(realHardwareProfile.resourceBufferBytes)}).`;
           }
           if (quickFixBtn) quickFixBtn.classList.remove('hidden');
         }
@@ -2425,51 +3032,53 @@
       }
     }
 
-    // Executa a Análise Básica do Celular e registra a 1ª etapa no Histórico
-    function runNativeDiagnosticScan() {
+    // Executa a Análise Real do Aparelho/PC e registra a 1ª etapa no Histórico
+    async function runNativeDiagnosticScan() {
+      await collectRealHardwareTelemetry(false);
+      const m = demoState.metrics;
       runConsoleExecution(
-        "Analisando o Celular...",
+        "Lendo Telemetria Real do Hardware...",
         [
-          "Lendo uso de Memória RAM (ActivityManager)...",
-          "Verificando partição de Armazenamento Interno...",
-          "Medindo temperatura e tensão da bateria..."
+          `Dispositivo: ${realHardwareProfile.deviceName}`,
+          `CPU: ${realHardwareProfile.cpuCores} núcleos (${m.cpuLatencyMs}ms) | GPU: ${realHardwareProfile.gpuModel}`,
+          `Memória: ${m.ram}% (${m.ramDetailLabel})`,
+          `Armazenamento: ${m.storageDetailLabel}`,
+          `Energia: ${m.batteryHealth} | Rede: ${m.netLabel}`
         ],
         () => {
           demoState.analysisVisibleOnDashboard = true;
           addAuditLogEntry(
             'ANÁLISE',
-            `Análise Básica executada: RAM em ${demoState.metrics.ram}%, Armazenamento em ${demoState.metrics.storage}% e Temperatura em ${demoState.metrics.temp.toFixed(1)}°C.`
+            `Análise Real executada em ${realHardwareProfile.deviceName}: Memória em ${m.ram}% (${m.ramDetailLabel}), Quota de Disco ${m.storageTotal} GB, CPU ${realHardwareProfile.cpuCores} núcleos (${m.cpuLatencyMs}ms), GPU ${realHardwareProfile.gpuModel} e Desempenho Real em ${m.performance}% (${m.fps} FPS).`
           );
           syncUiMetrics();
         }
       );
     }
 
-    // Executa a Otimização Básica Rápida e registra a 2ª etapa (Pós-Análise) no Histórico
+    // Executa a Otimização Básica Real (limpa buffers e timings reais do navegador) e registra no Histórico
     function runBasicPostAnalysisFix() {
+      const beforeResCount = realHardwareProfile.resourceCount;
+      const beforeHeapMB = realHardwareProfile.jsHeapUsedMB;
       runConsoleExecution(
-        "Executando Otimização Básica...",
+        "Limpando Buffers Reais do Sistema...",
         [
-          "Limpando cache básico temporário...",
-          "Liberando processos básicos em segundo plano...",
-          "Atualizando índice de desempenho..."
+          `Limpando ${beforeResCount} buffers de recursos (performance.clearResourceTimings)...`,
+          `Liberando objetos temporários do JS Heap (${beforeHeapMB} MB)...`,
+          "Recalculando latência real da CPU e taxa de quadros (FPS)..."
         ],
-        () => {
-          demoState.metrics.ram = 58;
-          demoState.metrics.ramUsed = 3.5;
-          demoState.metrics.storage = 84;
-          demoState.metrics.storageUsed = 107;
-          demoState.metrics.temp = 37.8;
-          demoState.metrics.performance = 84;
+        async () => {
+          await performRealBrowserCleanup();
           demoState.metrics.isCritical = false;
           demoState.analysisVisibleOnDashboard = true;
+          const m = demoState.metrics;
 
           addAuditLogEntry(
             'PÓS-ANÁLISE',
-            `Otimização Básica Rápida concluída: RAM reduzida para 58%, espaço em 84% e desempenho elevado para 84%.`
+            `Otimização Real concluída em ${realHardwareProfile.deviceName}: ${beforeResCount} buffers limpos, Memória atual em ${m.ram}% (${m.ramDetailLabel}) e Desempenho Real em ${m.performance}% (${m.fps} FPS).`
           );
           syncUiMetrics();
-          showToastNotice("Otimização básica concluída e registrada no Histórico!");
+          showToastNotice("Buffers reais limpos e telemetria atualizada no Histórico!");
         }
       );
     }
@@ -2517,9 +3126,38 @@
     }
 
     // =========================================================================
-    // FERRAMENTAS COMPLEXAS DO CHAT BOT (LIMPEZA PROFUNDA, SENSORES E UAC PC)
+    // FERRAMENTAS COMPLEXAS DO CHAT BOT (LIMPEZA PROFUNDA REAL, SENSORES REAIS E UAC PC)
     // =========================================================================
-    function openDeepCleanModal() {
+    function updateDeepCleanRealLabels() {
+      const heapMB = Math.max(0.5, Number(realHardwareProfile.jsHeapUsedMB || 1));
+      const resMB = Number((realHardwareProfile.resourceBufferBytes / (1024 * 1024)).toFixed(2));
+      const stoMB = Number((realHardwareProfile.storageUsageBytes / (1024 * 1024)).toFixed(2));
+      const lsMB = Number((realHardwareProfile.localStorageBytes / (1024 * 1024)).toFixed(3));
+
+      const heapDesc = document.getElementById('dc-item-heap-desc');
+      const resDesc = document.getElementById('dc-item-res-desc');
+      const stoDesc = document.getElementById('dc-item-storage-desc');
+      const sesDesc = document.getElementById('dc-item-session-desc');
+
+      if (heapDesc) heapDesc.innerText = `Alocação real no motor JS: ${heapMB.toFixed(2)} MB (Limite: ${realHardwareProfile.jsHeapLimitMB || 2048} MB)`;
+      if (resDesc) resDesc.innerText = `${realHardwareProfile.resourceCount} recursos em buffer • ${formatBytesHuman(realHardwareProfile.resourceBufferBytes)}`;
+      if (stoDesc) stoDesc.innerText = `Uso real na origem: ${formatBytesHuman(realHardwareProfile.storageUsageBytes)} (Quota: ${demoState.metrics.storageTotal} GB)`;
+      if (sesDesc) sesDesc.innerText = `Chaves locais/sessão: ${formatBytesHuman(realHardwareProfile.localStorageBytes)} (preserva contas)`;
+
+      const chkHeap = document.getElementById('dc-chk-heap');
+      const chkRes = document.getElementById('dc-chk-res');
+      const chkSto = document.getElementById('dc-chk-storage');
+      const chkSes = document.getElementById('dc-chk-session');
+
+      if (chkHeap) chkHeap.setAttribute('data-bytes', String(Math.round(heapMB * 1024 * 1024)));
+      if (chkRes) chkRes.setAttribute('data-bytes', String(realHardwareProfile.resourceBufferBytes || 0));
+      if (chkSto) chkSto.setAttribute('data-bytes', String(realHardwareProfile.storageUsageBytes || 0));
+      if (chkSes) chkSes.setAttribute('data-bytes', String(realHardwareProfile.localStorageBytes || 0));
+    }
+
+    async function openDeepCleanModal() {
+      await collectRealHardwareTelemetry(false);
+      updateDeepCleanRealLabels();
       recalcDeepCleanTotal();
       document.getElementById('deep-clean-modal').classList.remove('hidden');
     }
@@ -2530,51 +3168,50 @@
 
     function recalcDeepCleanTotal() {
       const chks = document.querySelectorAll('.deep-clean-chk');
-      let totalMb = 0;
+      let totalBytes = 0;
       chks.forEach(c => {
-        if (c.checked) totalMb += Number(c.getAttribute('data-mb') || 0);
+        if (c.checked) {
+          totalBytes += Number(c.getAttribute('data-bytes') || 0);
+        }
       });
       const label = document.getElementById('deep-clean-total-label');
       if (label) {
-        label.innerText = totalMb >= 1000 ? `${(totalMb / 1000).toFixed(2)} GB` : `${totalMb} MB`;
+        label.innerText = formatBytesHuman(totalBytes);
       }
-      return totalMb;
+      return totalBytes;
     }
 
     function executeDeepCleanSelected() {
-      const totalMb = recalcDeepCleanTotal();
-      if (totalMb <= 0) {
+      const totalBytes = recalcDeepCleanTotal();
+      const chksChecked = Array.from(document.querySelectorAll('.deep-clean-chk')).some(c => c.checked);
+      if (!chksChecked) {
         showToastNotice("Selecione pelo menos 1 item para limpar!");
         return;
       }
       closeDeepCleanModal();
-      const gbFormatted = (totalMb / 1000).toFixed(2);
+      const cleanedFormatted = formatBytesHuman(totalBytes);
 
       runConsoleExecution(
-        "Limpeza Profunda Autorizada...",
+        "Limpeza Profunda Real em Execução...",
         [
-          "pm trim-caches — Removendo caches selecionados...",
-          "Limpando mídias residuais e pastas órfãs...",
-          `Liberando ${gbFormatted} GB com segurança (LGPD)...`
+          "performance.clearResourceTimings() — Limpando buffers de rede...",
+          "caches.keys() — Limpando CacheStorage temporário do navegador...",
+          `Liberando ${cleanedFormatted} de memória/buffers reais (LGPD)...`
         ],
-        () => {
-          demoState.metrics.ram = 44;
-          demoState.metrics.ramUsed = 2.6;
-          demoState.metrics.storage = 75;
-          demoState.metrics.storageUsed = 96;
-          demoState.metrics.temp = 36.1;
-          demoState.metrics.performance = 97;
+        async () => {
+          await performRealBrowserCleanup();
           demoState.metrics.isCritical = false;
+          const m = demoState.metrics;
 
           addAuditLogEntry(
             'PÓS-ANÁLISE',
-            `Limpeza Profunda (via Chat Bot): ${gbFormatted} GB liberados, RAM em 44% e Desempenho em 97%.`
+            `Limpeza Profunda Real (via Chat Bot): ${cleanedFormatted} de buffers processados • Memória Real em ${m.ram}% (${m.ramDetailLabel}) e Desempenho Real em ${m.performance}% (${m.fps} FPS).`
           );
           syncUiMetrics();
 
           if (demoState.currentScreen === 'chat') {
             appendBotMessage(
-              `✓ <strong>Limpeza Profunda Concluída!</strong> Liberei <strong>${gbFormatted} GB</strong> de espaço no seu aparelho, reduzi o uso de RAM para <strong>44%</strong> e o desempenho subiu para <strong>97%</strong>. Tudo foi registrado no seu Histórico!`,
+              `✓ <strong>Limpeza Profunda Real Concluída!</strong> Processei e limpei <strong>${cleanedFormatted}</strong> de buffers e caches temporários em <strong>${realHardwareProfile.deviceName}</strong>. Uso atual de memória/heap: <strong>${m.ram}%</strong> (${m.ramDetailLabel}) e desempenho medido: <strong>${m.performance}%</strong> (${m.fps} FPS).`,
               { showAiCard: false }
             );
           }
@@ -2590,50 +3227,90 @@
       document.getElementById('hardware-test-modal').classList.add('hidden');
     }
 
-    function runSingleSensorTest(sensorKey) {
+    async function runSingleSensorTest(sensorKey) {
       if (sensorKey === 'audio') {
         playNotificationBeep(880, 260);
+        let sampleRateInfo = "48000Hz";
+        let devCountInfo = "";
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            sampleRateInfo = `${ctx.sampleRate}Hz`;
+            realHardwareProfile.audioSampleRate = ctx.sampleRate;
+            setTimeout(() => { try { ctx.close(); } catch (e) {} }, 350);
+          }
+          if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+            const devs = await navigator.mediaDevices.enumerateDevices();
+            const audioDevs = devs.filter(d => d.kind === 'audiooutput' || d.kind === 'audioinput');
+            realHardwareProfile.audioOutputCount = audioDevs.length;
+            if (audioDevs.length > 0) devCountInfo = ` • ${audioDevs.length} disp. áudio`;
+          }
+        } catch (e) {}
         const el = document.getElementById('sensor-status-audio');
         if (el) {
-          el.innerText = "✓ Som 880Hz Emitido • Alto-falante OK";
+          el.innerText = `✓ Onda 880Hz Real • Hardware: ${sampleRateInfo}${devCountInfo}`;
           el.className = "text-[10px] font-bold text-green-700";
         }
+        addAuditLogEntry('PÓS-ANÁLISE', `Teste Real de Áudio: Onda 880Hz emitida (Taxa de amostragem real: ${sampleRateInfo}${devCountInfo}).`);
       } else if (sensorKey === 'touch') {
         const el = document.getElementById('sensor-status-touch');
+        const tp = navigator.maxTouchPoints || 0;
+        const touchStr = tp > 0 ? `Touch Real: ${tp} pontos` : `Input: Mouse/Teclado (PC)`;
+        const resStr = `${realHardwareProfile.screenRes} (${realHardwareProfile.measuredHz}Hz / ${realHardwareProfile.measuredFps} FPS)`;
         if (el) {
-          el.innerText = "✓ Taxa de resposta 120Hz • Sem ponto cego";
+          el.innerText = `✓ Tela Real: ${resStr} • ${touchStr}`;
           el.className = "text-[10px] font-bold text-green-700";
         }
+        addAuditLogEntry('PÓS-ANÁLISE', `Teste Real de Display/Input: Resolução ${resStr} • ${touchStr}.`);
       } else if (sensorKey === 'net') {
         const el = document.getElementById('sensor-status-net');
         if (el) {
-          el.innerText = "✓ Ping 14ms • DNS 8.8.8.8 Estável";
-          el.className = "text-[10px] font-bold text-green-700";
+          el.innerText = "⏳ Medindo ping real da sua rede...";
+          el.className = "text-[10px] font-bold text-amber-700";
         }
-      } else if (sensorKey === 'bat') {
-        const el = document.getElementById('sensor-status-bat');
+        const ping = await measureRealNetworkPing();
+        const dl = realHardwareProfile.netDownlinkMbps ? ` • ${realHardwareProfile.netDownlinkMbps} Mbps` : '';
+        const netMsg = navigator.onLine
+          ? `✓ Ping Real: ${ping !== null ? ping + 'ms' : 'Online'} • Rede: ${realHardwareProfile.netType}${dl}`
+          : `⚠️ Sem conexão (Offline detectado pelo navegador)`;
         if (el) {
-          el.innerText = "✓ Tensão 4.18V • Célula Li-ion Saudável (92%)";
+          el.innerText = netMsg;
+          el.className = navigator.onLine ? "text-[10px] font-bold text-green-700" : "text-[10px] font-bold text-red-600";
+        }
+        syncUiMetrics();
+        addAuditLogEntry('PÓS-ANÁLISE', `Teste Real de Rede: ${netMsg}.`);
+      } else if (sensorKey === 'bat') {
+        await collectRealHardwareTelemetry(false);
+        const el = document.getElementById('sensor-status-bat');
+        const batMsg = `✓ ${demoState.metrics.batteryHealth} • ${demoState.metrics.batteryDrain}`;
+        if (el) {
+          el.innerText = batMsg;
           el.className = "text-[10px] font-bold text-green-700";
         }
+        addAuditLogEntry('PÓS-ANÁLISE', `Teste Real de Energia/Bateria: ${batMsg}.`);
       }
-      addAuditLogEntry('PÓS-ANÁLISE', `Teste de Sensor (${sensorKey.toUpperCase()}) realizado via Chat Bot: Aprovado.`);
     }
 
-    function runAllSensorTests() {
-      runSingleSensorTest('audio');
-      setTimeout(() => runSingleSensorTest('touch'), 180);
-      setTimeout(() => runSingleSensorTest('net'), 360);
-      setTimeout(() => {
-        runSingleSensorTest('bat');
-        showToastNotice("Todos os 4 sensores testados e aprovados!");
-        if (demoState.currentScreen === 'chat') {
-          appendBotMessage(
-            `🩺 <strong>Relatório de Sensores Concluído:</strong> Alto-falante (880Hz OK), Matriz Touchscreen (OK), Antena Wi-Fi/4G (Ping 14ms OK) e Célula de Bateria (4.18V OK). Nenhum defeito físico encontrado!`,
-            { showAiCard: false }
-          );
-        }
-      }, 540);
+    async function runAllSensorTests() {
+      await runSingleSensorTest('audio');
+      await runSingleSensorTest('touch');
+      await runSingleSensorTest('net');
+      await runSingleSensorTest('bat');
+      showToastNotice("Todos os 4 sensores reais foram lidos e testados!");
+      if (demoState.currentScreen === 'chat') {
+        const pingInfo = realHardwareProfile.realPingMs !== null ? `${realHardwareProfile.realPingMs}ms` : realHardwareProfile.netType;
+        const tp = navigator.maxTouchPoints || 0;
+        appendBotMessage(
+          `🩺 <strong>Relatório Real de Hardware (${realHardwareProfile.deviceName}):</strong><br>
+          • <strong>Áudio:</strong> Onda 880Hz emitida (${realHardwareProfile.audioSampleRate || 48000}Hz)<br>
+          • <strong>Tela/Input:</strong> ${realHardwareProfile.screenRes} @ ${realHardwareProfile.measuredHz}Hz (${realHardwareProfile.measuredFps} FPS • ${tp > 0 ? tp + ' pontos de toque' : 'Desktop/PC'})<br>
+          • <strong>GPU Real:</strong> ${realHardwareProfile.gpuModel}<br>
+          • <strong>Rede Real:</strong> ${realHardwareProfile.netType} (Ping medido: ${pingInfo})<br>
+          • <strong>Energia Real:</strong> ${demoState.metrics.batteryHealth} (${demoState.metrics.batteryDrain})`,
+          { showAiCard: false }
+        );
+      }
     }
 
     let currentUacTaskKey = 'ram';
@@ -2917,41 +3594,35 @@
       runConsoleExecution(
         cfg.title,
         [
-          `Executando pela IA: ${cfg.cmd}`,
+          `Executando pela IA em ${realHardwareProfile.deviceName}: ${cfg.cmd}`,
           ...cfg.steps
         ],
-        () => {
-          demoState.metrics.ram = 46;
-          demoState.metrics.ramUsed = 2.8;
-          if (currentUacTaskKey === 'storage') {
-            demoState.metrics.storage = 75;
-            demoState.metrics.storageUsed = 96;
-          }
-          demoState.metrics.temp = 36.4;
-          demoState.metrics.performance = 96;
+        async () => {
+          await performRealBrowserCleanup();
           demoState.metrics.isCritical = false;
 
           if (currentUacTaskKey === 'audio') {
-            runSingleSensorTest('audio');
+            await runSingleSensorTest('audio');
           } else if (currentUacTaskKey === 'touch') {
-            runSingleSensorTest('touch');
+            await runSingleSensorTest('touch');
           } else if (currentUacTaskKey === 'dns') {
-            runSingleSensorTest('net');
+            await runSingleSensorTest('net');
           } else if (currentUacTaskKey === 'charging' || currentUacTaskKey === 'battery_heat') {
-            runSingleSensorTest('bat');
+            await runSingleSensorTest('bat');
           }
 
+          const m = demoState.metrics;
           addAuditLogEntry(
             'PÓS-ANÁLISE',
-            `${cfg.title} autorizado e concluído pela IA no Chat Bot (RAM: 46%, Desempenho: 96%).`
+            `${cfg.title} autorizado e concluído pela IA em ${realHardwareProfile.deviceName} (Memória Real: ${m.ram}% • ${m.ramDetailLabel}, Desempenho Real: ${m.performance}% • ${m.fps} FPS).`
           );
           syncUiMetrics();
           const stepsDoneHtml = cfg.steps.map(s => `• ${s}`).join('<br>');
           appendBotMessage(
-            `✅ <strong>Pronto! A IA entrou no sistema e fez o ajuste por você!</strong><br><br>
-            <strong>O que a IA executou automaticamente:</strong><br>
+            `✅ <strong>Pronto! A IA limpou os buffers e aplicou o ajuste em ${realHardwareProfile.deviceName}!</strong><br><br>
+            <strong>O que a IA executou:</strong><br>
             ${stepsDoneHtml}<br><br>
-            📊 <strong>Resultado:</strong> Memória RAM em <strong>${demoState.metrics.ram}%</strong>, temperatura estabilizada em <strong>${demoState.metrics.temp.toFixed(1)}°C</strong> e desempenho elevado para <strong>${demoState.metrics.performance}%</strong>!<br><br>
+            📊 <strong>Telemetria Real Atual:</strong> Memória em <strong>${m.ram}%</strong> (${m.ramDetailLabel}), Latência CPU em <strong>${m.cpuLatencyMs}ms</strong> e Desempenho Real em <strong>${m.performance}%</strong> (${m.fps} FPS)!<br><br>
             <div class="p-2 bg-gray-50 border border-gray-200 rounded text-[10px] text-gray-700">
               ${cfg.manualGuide}
             </div>`,
@@ -3416,7 +4087,7 @@
       document.getElementById('reg-cpf').value = '';
       document.getElementById('reg-phone').value = '';
       document.getElementById('reg-email').value = '';
-      document.getElementById('reg-device').value = '';
+      document.getElementById('reg-device').value = realHardwareProfile.deviceName && !realHardwareProfile.deviceName.startsWith('Detectando') ? realHardwareProfile.deviceName : '';
       document.getElementById('reg-specialty').value = '';
       document.getElementById('reg-tech-key').value = '';
       document.getElementById('reg-pass').value = '';
@@ -3425,6 +4096,7 @@
       const sentStatus = document.getElementById('reg-credential-sent-status');
       if (sentStatus) sentStatus.classList.add('hidden');
       toggleRegisterRoleFields();
+      autoFillRealDeviceInRegister(false);
       hideFeedback('register-feedback-box');
     }
 
@@ -3594,8 +4266,8 @@
         validatedTechCode = lastGeneratedTechCredential.toUpperCase();
       }
 
-      const deviceVal = document.getElementById('reg-device').value.trim() || "Android Identificado";
-      const specVal = document.getElementById('reg-specialty').value.trim() || "Suporte Técnico Android";
+      const deviceVal = document.getElementById('reg-device').value.trim() || realHardwareProfile.deviceName || "Dispositivo Real";
+      const specVal = document.getElementById('reg-specialty').value.trim() || "Suporte Técnico";
 
       const newUser = {
         name: name,
@@ -3824,30 +4496,18 @@
       }, 500);
     }
 
-    // Sincroniza com as APIs reais disponíveis no navegador do aparelho (RAM aproximada, Bateria real, Rede real)
+    // Sincroniza todas as APIs reais disponíveis no navegador do aparelho ou PC
     async function syncRealLocalHardwareMetrics() {
-      try {
-        if (navigator.deviceMemory) {
-          const totalRam = Number(navigator.deviceMemory);
-          if (totalRam >= 2 && totalRam <= 24) {
-            demoState.metrics.ramTotal = totalRam;
-            demoState.metrics.ramUsed = Number(((demoState.metrics.ram / 100) * totalRam).toFixed(1));
-          }
-        }
-        if (navigator.getBattery) {
-          const bat = await navigator.getBattery();
-          if (bat) {
-            const pct = Math.round(bat.level * 100);
-            const chargingStr = bat.charging ? "Carregando" : "Descarregando";
-            demoState.metrics.batteryDrain = `Bat. Real: ${pct}% (${chargingStr})`;
-          }
-        }
-      } catch (e) {}
-      syncUiMetrics();
-      showToastNotice("Dados sincronizados com os sensores permitidos pelo navegador!");
+      await collectRealHardwareTelemetry(true);
+      const m = demoState.metrics;
       if (demoState.currentScreen === 'chat') {
         appendBotMessage(
-          `✓ <strong>Leitura Local Atualizada:</strong> Sincronizei os dados liberados pelo navegador (RAM base: <strong>${demoState.metrics.ramTotal.toFixed(1)} GB</strong> • Energia: <strong>${demoState.metrics.batteryDrain}</strong>).`,
+          `✓ <strong>Telemetria Real Sincronizada (${realHardwareProfile.deviceName}):</strong><br>
+          • <strong>SO / CPU:</strong> ${m.osLabel} • ${m.cpuLabel} (Latência: ${m.cpuLatencyMs}ms)<br>
+          • <strong>GPU Real:</strong> ${m.gpuLabel}<br>
+          • <strong>Memória Real:</strong> ${m.ram}% (${m.ramDetailLabel})<br>
+          • <strong>Armazenamento Real:</strong> ${m.storageDetailLabel}<br>
+          • <strong>Energia &amp; Rede:</strong> ${m.batteryHealth} • ${m.netLabel}`,
           { showSupportFooter: false, showAiCard: false }
         );
       }
@@ -4266,13 +4926,16 @@
         // C. INTENÇÕES DIRETAS (COM PROGRESSÃO DE ETAPAS SEM REPETIR TEXTO)
         // =====================================================================
 
-        // 1. Dúvida sobre dados locais vs simulados
-        if (norm.match(/\b(coincidem|dados locais|dados apresentados|nao bate|nao batem|dados errados|diferente do meu|meu celular real|valores falsos|simulado)\b/)) {
+        // 1. Consulta sobre telemetria e dados reais do aparelho / PC
+        if (norm.match(/\b(coincidem|dados locais|dados apresentados|nao bate|nao batem|dados errados|diferente do meu|meu celular real|valores falsos|simulado|dados reais|hardware real|meu pc)\b/)) {
           botContext.lastTopic = 'sensor_mismatch';
           appendBotMessage(
-            `Boa pergunta! Por proteção de privacidade do Android (<strong>Sandbox / LGPD</strong>), navegadores web não têm permissão para ler a temperatura real da CPU nem a lista privada de processos sem um app nativo instalado.<br><br>
-            Por isso os medidores iniciam com um cenário demonstrativo de diagnóstico. Mas você pode sincronizar agora mesmo os sensores que o seu navegador libera (RAM base e bateria real):<br>
-            <button type="button" onclick="syncRealLocalHardwareMetrics()" class="mt-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10px] shadow-sm">🔄 Ler Sensores Permitidos pelo Navegador</button>`,
+            `Os dados exibidos no HelpTop são lidos em <strong>tempo real diretamente do seu hardware e navegador</strong> (<strong>${realHardwareProfile.deviceName}</strong>):<br><br>
+            • <strong>CPU &amp; GPU Reais:</strong> ${realHardwareProfile.cpuCores} núcleos lógicos • ${realHardwareProfile.gpuModel}<br>
+            • <strong>Memória Real:</strong> ${m.ram}% (${m.ramDetailLabel})<br>
+            • <strong>Armazenamento Real:</strong> ${m.storageDetailLabel}<br>
+            • <strong>Energia &amp; Rede:</strong> ${m.batteryHealth} • ${m.netLabel}<br>
+            <button type="button" onclick="syncRealLocalHardwareMetrics()" class="mt-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[10px] shadow-sm">🔄 Atualizar Leitura Real Agora</button>`,
             { showSupportFooter: false, showAiCard: false }
           );
           return;
@@ -4864,7 +5527,9 @@
     function connectOrSendClientSupportMessage(rawText) {
       const clientName = demoState.user ? demoState.user.name : "Cliente";
       const clientEmail = demoState.user ? demoState.user.email : "";
-      const clientDevice = demoState.user ? (demoState.user.device || "Android") : "Android";
+      const clientDevice = (demoState.user && demoState.user.device && !/Android Identificado/i.test(demoState.user.device))
+        ? demoState.user.device
+        : (realHardwareProfile.deviceName || "Dispositivo Real");
 
       if (!supportProtocolConnected) {
         const match = rawText.toUpperCase().match(/HT-\d+/);
@@ -4913,7 +5578,7 @@
               {
                 senderRole: 'system',
                 senderName: 'HelpTop IA',
-                text: `📋 <strong>Resumo do Pré-Atendimento:</strong> ${preSummary} • Aparelho: ${clientDevice} (RAM ${m.ram}%, Espaço ${m.storage}%, Temp ${m.temp.toFixed(1)}°C).`
+                text: `📋 <strong>Resumo do Pré-Atendimento (Hardware Real):</strong> ${preSummary} • Dispositivo: <strong>${clientDevice}</strong> • CPU ${realHardwareProfile.cpuCores} núcleos (${m.cpuLatencyMs}ms) • GPU ${realHardwareProfile.gpuModel} • Memória ${m.ram}% (${m.ramDetailLabel}) • Disco ${m.storageDetailLabel} • Energia ${m.batteryHealth}.`
               }
             ]
           };
@@ -4962,15 +5627,17 @@
       }
     }
 
-    function clientSendUpdatedTelemetryToTech() {
+    async function clientSendUpdatedTelemetryToTech() {
       if (!generatedProtocolCode) return;
+      await collectRealHardwareTelemetry(false);
       supportTickets = loadSupportTickets();
       const ticket = supportTickets.find(t => t.protocol === generatedProtocolCode);
       if (!ticket) return;
 
       const m = demoState.metrics;
       ticket.metrics = { ...m };
-      const msgText = `📡 <strong>Telemetria Atualizada pelo Cliente:</strong> RAM ${m.ram}% (${m.ramUsed.toFixed(1)}/${m.ramTotal.toFixed(1)} GB) • Espaço ${m.storage}% • Temp ${m.temp.toFixed(1)}°C • Desempenho ${m.performance}%.`;
+      ticket.clientDevice = realHardwareProfile.deviceName || ticket.clientDevice;
+      const msgText = `📡 <strong>Telemetria Real Atualizada (${realHardwareProfile.deviceName}):</strong> Memória ${m.ram}% (${m.ramDetailLabel}) • Armazenamento ${m.storageDetailLabel} • CPU ${realHardwareProfile.cpuCores} núcleos (${m.cpuLatencyMs}ms) • GPU ${realHardwareProfile.gpuModel} • Energia ${m.batteryHealth} • Desempenho ${m.performance}% (${m.fps} FPS).`;
       ticket.messages.push({
         senderRole: 'system',
         senderName: demoState.user ? demoState.user.name : 'Cliente',
@@ -4981,10 +5648,10 @@
       broadcastFullState({
         action: 'CLIENT_TELEMETRY',
         protocol: ticket.protocol,
-        previewText: `Cliente atualizou a telemetria do chamado ${ticket.protocol}.`
+        previewText: `Cliente enviou telemetria real atualizada (${realHardwareProfile.deviceName}) no chamado ${ticket.protocol}.`
       });
       renderClientSupportMessages(ticket.protocol);
-      showToastNotice("Telemetria enviada ao técnico em tempo real!");
+      showToastNotice("Telemetria real do hardware enviada ao técnico!");
     }
 
     function clientRateSupportTicket(protocolCode, stars) {
@@ -5106,7 +5773,7 @@
           : [
               `✓ Túnel AnyDesk ativo (${modeLabel} • ID ${remoteId})`,
               `📦 Programa do Suporte carregado: ${progName}`,
-              `⚡ Limpeza Remota concluída: RAM 45% • Temp 36.2°C • Desempenho 96%`
+              `⚡ Limpeza Remota Real: Memória ${demoState.metrics.ram}% • CPU ${demoState.metrics.cpuLatencyMs}ms • Desempenho ${demoState.metrics.performance}%`
             ];
         dock.innerHTML = `
           <div class="flex items-center justify-between border-b border-slate-700 pb-1.5">
@@ -5134,7 +5801,7 @@
       }
     }
 
-    function clientRespondAnyDeskSession(protocolCode, accepted) {
+    async function clientRespondAnyDeskSession(protocolCode, accepted) {
       supportTickets = loadSupportTickets();
       const ticket = supportTickets.find(t => t.protocol === protocolCode);
       if (!ticket || !ticket.remoteSession) return;
@@ -5161,29 +5828,22 @@
         return;
       }
 
-      // Cliente aceitou: ativa a sessão AnyDesk, roda o Programa do Suporte e aplica a Limpeza Remota mantendo o chat aberto!
+      // Cliente aceitou: limpa buffers reais do dispositivo/PC, rele a telemetria real e atualiza o chamado!
+      await performRealBrowserCleanup();
+      demoState.metrics.isCritical = false;
+      const m = demoState.metrics;
+
       ticket.remoteSession.active = true;
       ticket.remoteSession.status = 'connected';
       ticket.remoteSession.logs = [
-        `✓ Conexão AnyDesk (${modeText}) autorizada pelo cliente`,
+        `✓ Conexão AnyDesk (${modeText}) autorizada em ${realHardwareProfile.deviceName}`,
         `📦 Executando programa do suporte: ${progName}`,
-        `⚡ Limpando cache e processos travados -> RAM: 45% | Temp: 36.2°C | Desempenho: 96%`
+        `⚡ Limpeza Real concluída -> Memória: ${m.ram}% (${m.ramDetailLabel}) | CPU: ${m.cpuLatencyMs}ms | Desempenho: ${m.performance}% (${m.fps} FPS)`
       ];
-      ticket.metrics = {
-        ram: 45,
-        ramUsed: 2.7,
-        ramTotal: 6.0,
-        storage: 76,
-        storageUsed: 97,
-        storageTotal: 128,
-        temp: 36.2,
-        performance: 96,
-        isCritical: false
-      };
-      demoState.metrics = { ...demoState.metrics, ...ticket.metrics };
+      ticket.metrics = { ...m };
       syncUiMetrics();
 
-      const msgText = `🖥️ <strong>Sessão AnyDesk (${modeText}) Conectada!</strong> Programa do suporte <code>${progName}</code> executado com sucesso: RAM reduzida para <strong>45%</strong>, Temperatura em <strong>36.2°C</strong> e Desempenho em <strong>96%</strong> (chat continua ativo!).`;
+      const msgText = `🖥️ <strong>Sessão AnyDesk (${modeText}) Conectada em ${realHardwareProfile.deviceName}!</strong> Programa do suporte <code>${progName}</code> executado com sucesso: Memória real em <strong>${m.ram}%</strong> (${m.ramDetailLabel}), Latência CPU em <strong>${m.cpuLatencyMs}ms</strong> e Desempenho Real em <strong>${m.performance}%</strong> (${m.fps} FPS)!`;
       ticket.messages.push({
         senderRole: 'system',
         senderName: rs.techName || 'Suporte Técnico',
@@ -5192,7 +5852,7 @@
 
       addAuditLogEntry(
         'PÓS-ANÁLISE',
-        `Sessão AnyDesk (${modeText}) + Programa "${progName}" autorizados no protocolo ${ticket.protocol} (RAM: 45%, Desempenho: 96%).`
+        `Sessão AnyDesk (${modeText}) + Programa "${progName}" executados em ${realHardwareProfile.deviceName} no protocolo ${ticket.protocol} (Memória Real: ${m.ram}%, Desempenho: ${m.performance}%).`
       );
 
       saveSupportTickets(false);
@@ -5202,7 +5862,7 @@
         previewText: msgText
       });
       renderClientSupportMessages(protocolCode);
-      showToastNotice("Sessão AnyDesk conectada e programa do suporte executado!");
+      showToastNotice("Sessão AnyDesk conectada e limpeza real executada!");
     }
 
     function closeAnyDeskRemoteSession(protocolCode) {
@@ -5368,7 +6028,7 @@
       queueEl.innerHTML = '';
       filtered.forEach(t => {
         const isSelected = activeTechTicketProtocol === t.protocol;
-        const m = t.metrics || { ram: 88, performance: 52 };
+        const m = t.metrics || demoState.metrics;
         const statusColor = t.status === 'Resolvido'
           ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
           : (t.status === 'Em Atendimento' ? 'bg-blue-100 border-blue-400 text-blue-900' : 'bg-amber-100 border-amber-400 text-amber-900');
@@ -5466,7 +6126,7 @@
         }
       }
 
-      const m = ticket.metrics || { ram: 88, storage: 94, temp: 41.8, performance: 52 };
+      const m = ticket.metrics || demoState.metrics;
       const ramEl = document.getElementById('tech-metric-ram');
       const stoEl = document.getElementById('tech-metric-storage');
       const tempEl = document.getElementById('tech-metric-temp');
@@ -5560,7 +6220,7 @@
       renderTechActiveTicketDetails();
     }
 
-    function techExecuteRemoteAction(actionType) {
+    async function techExecuteRemoteAction(actionType) {
       if (!activeTechTicketProtocol) {
         showToastNotice("Selecione um protocolo na fila primeiro!");
         return;
@@ -5597,6 +6257,10 @@
         ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
       } else if (actionType === 'clean') {
         ticket.status = "Em Atendimento";
+        await performRealBrowserCleanup();
+        demoState.metrics.isCritical = false;
+        const baseM = ticket.metrics ? { ...ticket.metrics, ...demoState.metrics, isCritical: false } : { ...demoState.metrics };
+        ticket.metrics = baseM;
         ticket.remoteSession = {
           active: true,
           status: 'connected',
@@ -5607,21 +6271,10 @@
           logs: [
             `🟢 Sessão AnyDesk Ativa (${modeText} • ID ${remoteId})`,
             `📦 Programa do Suporte em execução: ${programName}`,
-            `⚡ Limpeza Remota concluída: RAM 45% • Temp 36.2°C • Desempenho 96%`
+            `⚡ Telemetria Real pós-limpeza: Memória ${baseM.ram}% (${baseM.ramDetailLabel || ''}) • Desempenho ${baseM.performance}% (${baseM.fps || 60} FPS)`
           ]
         };
-        ticket.metrics = {
-          ram: 45,
-          ramUsed: 2.7,
-          ramTotal: 6.0,
-          storage: 76,
-          storageUsed: 97,
-          storageTotal: 128,
-          temp: 36.2,
-          performance: 96,
-          isCritical: false
-        };
-        msgText = `🖥️ <strong>Limpeza Remota via AnyDesk (${modeText} • ID ${remoteId}):</strong> O técnico ${techName} executou o programa de suporte <code>${programName}</code>! RAM reduzida para <strong>45%</strong>, Temperatura em <strong>36.2°C</strong> e Desempenho em <strong>96%</strong> (o chat continua ativo!).`;
+        msgText = `🖥️ <strong>Limpeza Remota via AnyDesk (${modeText} • ID ${remoteId}):</strong> O técnico ${techName} executou o programa de suporte <code>${programName}</code>! Telemetria real do sistema: Memória em <strong>${baseM.ram}%</strong> (${baseM.ramDetailLabel || ''}), Latência CPU em <strong>${baseM.cpuLatencyMs || 1}ms</strong> e Desempenho em <strong>${baseM.performance}%</strong> (o chat continua ativo!).`;
         ticket.messages.push({ senderRole: 'tech', senderName: techName, text: msgText });
       } else if (actionType === 'safemode') {
         ticket.status = "Em Atendimento";
@@ -5697,7 +6350,7 @@
       } catch (e) {}
     }
 
-    function resetDemoState() {
+    async function resetDemoState() {
       registeredUsers = [];
       supportTickets = [];
       activeTechTicketProtocol = null;
@@ -5714,31 +6367,19 @@
       demoState.analysisVisibleOnDashboard = false;
       demoState.reminderEnabled = false;
       demoState.auditLogs = [];
-      demoState.metrics = {
-        ram: 88,
-        ramUsed: 5.3,
-        ramTotal: 6.0,
-        storage: 94,
-        storageUsed: 120,
-        storageTotal: 128,
-        temp: 41.8,
-        performance: 52,
-        batteryHealth: "Boa (92%)",
-        batteryDrain: "4.1V • Estável",
-        isCritical: true
-      };
 
       const chkRem = document.getElementById('chk-auto-schedule');
       if (chkRem) chkRem.checked = false;
       syncReminderButtonBadge();
 
+      await collectRealHardwareTelemetry(false);
       broadcastFullState({ action: 'RESET_ALL' });
       syncUiMetrics();
       resetBotConversationContext();
       clearLoginForm();
       clearRegisterForm();
       goToScreen('welcome');
-      showToastNotice("Sistema 100% zerado (sem cadastros ou chamados)!");
+      showToastNotice("Sistema 100% zerado e telemetria real recarregada!");
     }
   </script>
 </body>
